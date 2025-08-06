@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 其他现有样式 -->
+
+    <!-- 新增圆角按钮样式 -->
+    <style name="RoundedButton" parent="Widget.MaterialComponents.Button">
+        <item name="cornerRadius">20dp</item>
+        <item name="iconPadding">8dp</item>
+    </style>
+</resources>

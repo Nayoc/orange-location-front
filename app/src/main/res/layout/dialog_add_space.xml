@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:padding="16dp">
+
+    <!-- 空间名称输入 -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="24dp"
+        android:gravity="center_vertical">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="空间名称："
+            android:textColor="#666666"
+            android:textSize="14sp"
+            android:width="100dp" />
+
+        <EditText
+            android:id="@+id/et_space_name"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="请输入空间名称"
+            android:inputType="text"
+            android:textSize="14sp" />
+    </LinearLayout>
+
+    <!-- 空间图片上传（文字右侧放按钮） -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="16dp"
+        android:gravity="center_vertical">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="空间图片："
+            android:textColor="#666666"
+            android:textSize="14sp"
+            android:width="100dp" />
+
+        <Button
+            android:id="@+id/btn_upload_image"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="选择图片"
+            android:backgroundTint="#E3F2FD"
+            android:textColor="#1976D2"
+            android:textSize="14sp" />
+    </LinearLayout>
+
+    <!-- 图片预览区域 -->
+    <ImageView
+        android:id="@+id/iv_preview"
+        android:layout_width="200dp"
+        android:layout_height="200dp"
+        android:layout_gravity="center_horizontal"
+        android:layout_marginBottom="24dp"
+        android:scaleType="centerCrop"
+        android:visibility="gone" />
+
+    <!-- 底部保存按钮 -->
+    <Button
+        android:id="@+id/btn_save"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:backgroundTint="#1976D2"
+        android:text="保存"
+        android:textColor="@android:color/white"
+        android:textSize="16sp" />
+
+</LinearLayout>
