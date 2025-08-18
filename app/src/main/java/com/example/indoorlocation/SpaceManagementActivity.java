@@ -25,6 +25,7 @@ import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.example.indoorlocation.adapter.SpaceAdapter;
+import com.example.indoorlocation.constant.HttpConstant;
 import com.example.indoorlocation.model.Space;
 import com.example.indoorlocation.util.FileUtil;
 import com.example.indoorlocation.util.LocationHelper;
@@ -58,7 +59,6 @@ public class SpaceManagementActivity extends Activity {
     private File imageFile;
     private AlertDialog currentDialog;
     private LocationHelper locationHelper;
-    private static final String BASE_URL = "http://10.8.13.38:50555/space";
     private static final int STORAGE_PERMISSION_REQUEST_CODE = 103;
     private static final int PICK_IMAGE_FROM_GALLERY = 101; // 图库选择请求码
     private static final int REQUEST_STORAGE_PERMISSION = 102; // 存储权限请求码
@@ -120,7 +120,7 @@ public class SpaceManagementActivity extends Activity {
     private void fetchSpaces() {
 
         Request request = new Request.Builder()
-                .url(BASE_URL)
+                .url(HttpConstant.BASE_URL)
                 .build();
 
         client.newCall(request).enqueue(new Callback() {
@@ -177,7 +177,7 @@ public class SpaceManagementActivity extends Activity {
                 }
 
                 Request request = new Request.Builder()
-                        .url(BASE_URL)
+                        .url(HttpConstant.BASE_URL)
                         .post(builder.build())
                         .build();
 
@@ -209,7 +209,7 @@ public class SpaceManagementActivity extends Activity {
     // 删除空间
     private void deleteSpace(String spaceId, int position) {
         Request request = new Request.Builder()
-                .url(BASE_URL + "/" + spaceId)
+                .url(HttpConstant.BASE_URL + "/" + spaceId)
                 .delete()
                 .build();
 
@@ -400,7 +400,7 @@ public class SpaceManagementActivity extends Activity {
         RequestBody body = RequestBody.create(json, JSON);
 
         Request request = new Request.Builder()
-                .url(BASE_URL + "/" + space.getId())
+                .url(HttpConstant.BASE_URL + "/" + space.getId())
                 .put(body)
                 .build();
 
@@ -456,7 +456,7 @@ public class SpaceManagementActivity extends Activity {
         RequestBody body = RequestBody.create(json, JSON);
 
         Request request = new Request.Builder()
-                .url(BASE_URL)
+                .url(HttpConstant.BASE_URL)
                 .put(body)
                 .build();
 

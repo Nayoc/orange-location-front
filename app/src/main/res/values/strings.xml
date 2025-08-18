@@ -1,3 +1,18 @@
 <resources>
     <string name="app_name">IndoorLocation</string>
+    <string name="system_ready">系统就绪...</string>
+    <string name="coordinate_x">X:</string>
+    <string name="coordinate_y">Y:</string>
+    <string name="coordinate_default">0</string>
+    <string name="collect_count">采集:</string>
+    <string name="start_collect">开始采集</string>
+    <string name="stop_collect">停止采集</string>
+    <string name="start_position">开始定位</string>
+    <string name="stop_position">停止定位</string>
+    <string name="upload_map">上传地图</string>
+    <string name="log_output">日志输出</string>
+    <string name="back">返回</string>
+    <string name="map_content_description">地图</string>
+    <string name="start_collect_button">开始采集</string>
+    <string name="collect_button">开始采集</string>
 </resources>

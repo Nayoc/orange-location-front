@@ -1,6 +1,7 @@
 package com.example.indoorlocation.adapter;
 
 import android.content.Context;
+import android.content.Intent;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -70,6 +71,15 @@ public class SpaceAdapter extends RecyclerView.Adapter<SpaceAdapter.SpaceViewHol
                     listener.onNameClick(pos, space);
                 }
             }
+        });
+
+        // 点击整个项进入地图页面
+        holder.itemView.setOnClickListener(v -> {
+            Context context = holder.itemView.getContext();
+            Intent intent = new Intent(context, com.example.indoorlocation.MapActivity.class);
+            intent.putExtra("spaceId", space.getId());
+            intent.putExtra("spaceName", space.getSpaceName());
+            context.startActivity(intent);
         });
     }
 

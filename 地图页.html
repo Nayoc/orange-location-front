@@ -1,0 +1,303 @@
+<template>
+<view class="container">
+<!-- 顶部导航 -->
+<view class="nav">
+<view class="nav-left">
+<uni-icons type="back" size="24" color="#333"></uni-icons>
+<text class="title">冰淇淋</text>
+</view>
+<view class="nav-right">
+<uni-icons type="refresh" size="24" color="#333"></uni-icons>
+<uni-icons type="camera" size="24" color="#333"></uni-icons>
+<uni-icons type="gear" size="24" color="#333"></uni-icons>
+</view>
+</view>
+<!-- 地图区域 -->
+<view class="map-container">
+<view v-if="!hasMap" class="upload-box">
+<uni-button type="primary" @click="handleUpload">上传地图</uni-button>
+</view>
+<image v-else :src="mapUrl" class="map-image"></image>
+<view class="map-controls">
+<uni-button class="axis-btn" size="mini" @click="toggleAxis">
+<uni-icons :type="showAxis ? 'eye' : 'eye-slash'" size="16"></uni-icons>
+</uni-button>
+</view>
+</view>
+<!-- 信息输出区 -->
+<view class="output-panel">
+<view class="output-content">
+{{ outputText }}
+</view>
+</view>
+<!-- 控制按钮区 -->
+<view class="control-panel">
+<view class="coordinate-group">
+<view class="coordinate-row">
+<view class="coordinate-input">
+<text class="coordinate-label">X:</text>
+<input type="number" v-model="coordinates.x" class="coordinate-value" />
+</view>
+<view class="coordinate-input">
+<text class="coordinate-label">Y:</text>
+<input type="number" v-model="coordinates.y" class="coordinate-value" />
+</view>
+<view class="sample-control" v-if="mode === 'collect'">
+<text class="sample-text">位置采集</text>
+<picker :value="sampleCountIndex" :range="sampleCounts" @change="handleSampleCountChange" class="sample-picker">
+<view class="picker-view">{{ sampleCounts[sampleCountIndex] }}次</view>
+</picker>
+<uni-icons type="right" size="16" color="#007AFF" @click="handleCollect" class="collect-icon"></uni-icons>
+</view>
+</view>
+</view>
+<view class="button-group">
+<view class="mode-wrapper">
+<picker :value="modeIndex" :range="modes" @change="handleModeChange" class="mode-select">
+<view class="mode-text">{{ modes[modeIndex] }}</view>
+</picker>
+<uni-button type="primary" size="default" @click="handleStart" class="start-button">
+{{ mode === 'collect' ? '开始采集' : '开始定位' }}
+</uni-button>
+</view>
+</view>
+</view>
+</view>
+</template>
+<script lang="ts" setup>
+import { ref } from 'vue';
+const hasMap = ref(false);
+const mapUrl = ref('');
+const showAxis = ref(true);
+const outputText = ref('系统就绪...');
+const isCollecting = ref(false);
+const isPositioning = ref(false);
+const coordinates = ref({ x: 0, y: 0 });
+const sampleCounts = [1, 5, 10, 30];
+const sampleCountIndex = ref(0);
+const modes = ['采集', '定位'];
+const modeIndex = ref(0);
+const mode = ref('collect');
+const handleSampleCountChange = (e: any) => {
+sampleCountIndex.value = e.detail.value;
+outputText.value = `设置采样次数为: ${sampleCounts[sampleCountIndex.value]}次`;
+};
+const handleModeChange = (e: any) => {
+modeIndex.value = e.detail.value;
+mode.value = modeIndex.value === 0 ? 'collect' : 'position';
+};
+const handleStart = () => {
+if (mode.value === 'collect') {
+isCollecting.value = !isCollecting.value;
+outputText.value = isCollecting.value ? '开始采集数据...' : '采集已停止';
+} else {
+isPositioning.value = !isPositioning.value;
+outputText.value = isPositioning.value ? '开始定位...' : '定位已停止';
+}
+};
+const handleCollect = () => {
+outputText.value = `正在采集位置 (${coordinates.value.x}, ${coordinates.value.y})，将采集${sampleCounts[sampleCountIndex.value]}次`;
+};
+const handleUpload = () => {
+uni.chooseImage({
+count: 1,
+success: (res) => {
+mapUrl.value = res.tempFilePaths[0];
+hasMap.value = true;
+outputText.value = '地图上传成功';
+}
+});
+};
+const toggleAxis = () => {
+showAxis.value = !showAxis.value;
+};
+const toggleCollect = () => {
+isCollecting.value = !isCollecting.value;
+outputText.value = isCollecting.value ? '开始采集数据...' : '采集已暂停';
+};
+const togglePosition = () => {
+isPositioning.value = !isPositioning.value;
+outputText.value = isPositioning.value ? '开始定位...' : '定位已暂停';
+};
+</script>
+<style>
+page {
+height: 100%;
+}
+.container {
+height: 100%;
+display: flex;
+flex-direction: column;
+background-color: #f5f5f5;
+}
+.nav {
+display: flex;
+justify-content: space-between;
+align-items: center;
+padding: 20rpx 30rpx;
+background-color: #ffffff;
+}
+.nav-left {
+display: flex;
+align-items: center;
+}
+.nav-right {
+display: flex;
+gap: 30rpx;
+}
+.title {
+margin-left: 20rpx;
+font-size: 16px;
+font-weight: 500;
+color: #333333;
+}
+.map-container {
+flex: 1;
+position: relative;
+margin: 30rpx;
+background-color: #ffffff;
+border-radius: 20rpx;
+overflow: hidden;
+}
+.upload-box {
+height: 100%;
+display: flex;
+justify-content: center;
+align-items: center;
+}
+.map-image {
+width: 100%;
+height: 100%;
+object-fit: contain;
+}
+.map-controls {
+position: absolute;
+top: 20rpx;
+right: 20rpx;
+}
+.axis-btn {
+background-color: #ffffff;
+border-radius: 8px;
+box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+.output-panel {
+margin: 0 30rpx;
+padding: 20rpx;
+height: 200rpx;
+background-color: #ffffff;
+border-radius: 20rpx;
+}
+.output-content {
+height: 100%;
+font-size: 14px;
+color: #666666;
+line-height: 1.5;
+overflow-y: auto;
+}
+.control-panel {
+margin: 30rpx;
+padding: 30rpx;
+background-color: #ffffff;
+border-radius: 20rpx;
+}
+
+.coordinate-group {
+margin-bottom: 30rpx;
+}
+
+.coordinate-row {
+display: flex;
+align-items: center;
+gap: 30rpx;
+}
+
+.coordinate-input {
+display: flex;
+align-items: center;
+gap: 10rpx;
+}
+
+.coordinate-label {
+font-size: 14px;
+color: #666666;
+}
+
+.coordinate-value {
+width: 100rpx;
+height: 60rpx;
+border: 1px solid #ddd;
+border-radius: 8rpx;
+padding: 0 10rpx;
+font-size: 14px;
+}
+
+.sample-control {
+display: flex;
+align-items: center;
+gap: 15rpx;
+}
+
+.sample-text {
+font-size: 14px;
+color: #666666;
+}
+
+.sample-picker {
+width: 100rpx;
+background: #f5f7fa;
+border-radius: 8rpx;
+}
+
+.picker-view {
+height: 60rpx;
+line-height: 60rpx;
+text-align: center;
+font-size: 14px;
+color: #333;
+}
+
+.collect-icon {
+margin-left: 10rpx;
+}
+
+.button-group {
+display: flex;
+justify-content: center;
+gap: 30rpx;
+}
+
+.mode-wrapper {
+display: flex;
+align-items: center;
+gap: 30rpx;
+}
+
+.mode-select {
+width: 160rpx;
+height: 70rpx;
+background: #f5f7fa;
+border-radius: 8rpx;
+display: flex;
+align-items: center;
+justify-content: center;
+}
+
+.mode-text {
+font-size: 14px;
+color: #333;
+text-align: center;
+line-height: 70rpx;
+}
+
+.start-button {
+min-width: 200rpx;
+height: 70rpx;
+line-height: 70rpx;
+background: #007AFF;
+color: #ffffff;
+font-size: 14px;
+border-radius: 8rpx;
+text-align: center;
+box-shadow: 0 4rpx 12rpx rgba(0, 122, 255, 0.2);
+}
+</style>

@@ -7,4 +7,8 @@
         <item name="cornerRadius">20dp</item>
         <item name="iconPadding">8dp</item>
     </style>
+    <!--无ActionBar样式-->
+    <style name="AppTheme.NoActionBar" parent="Theme.AppCompat.Light.NoActionBar">
+        <!-- 其他主题属性配置 -->
+    </style>
 </resources>

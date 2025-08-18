@@ -1,7 +1,10 @@
 package com.example.indoorlocation.util;
 
+import android.content.ContentResolver;
 import android.content.Context;
+import android.database.Cursor;
 import android.net.Uri;
+import android.provider.OpenableColumns;
 
 import java.io.File;
 import java.io.FileOutputStream;
@@ -34,7 +37,7 @@ public class FileUtil {
             }
 
             // 创建临时文件
-            String fileName = "space_plan_" + System.currentTimeMillis() + ".jpg";
+            String fileName = getFileName(context.getContentResolver(), uri);
             File cacheDir = context.getExternalCacheDir();
 
             // 如果外部缓存目录不可用，使用内部缓存目录
@@ -75,5 +78,48 @@ public class FileUtil {
                 e.printStackTrace();
             }
         }
+    }
+
+    /**
+     * 从Uri获取文件名
+     * @param contentResolver ContentResolver
+     * @param uri 文件Uri
+     * @return 文件名
+     */
+    public static String getFileName(ContentResolver contentResolver, Uri uri) {
+        String result = null;
+        if (uri.getScheme().equals("content")) {
+            Cursor cursor = contentResolver.query(uri, null, null, null, null);
+            try {
+                if (cursor != null && cursor.moveToFirst()) {
+                    int nameIndex = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME);
+                    if (nameIndex != -1) {
+                        result = cursor.getString(nameIndex);
+                    }
+                }
+            } finally {
+                if (cursor != null) {
+                    cursor.close();
+                }
+            }
+        }
+        if (result == null) {
+            result = uri.getPath();
+            int cut = result.lastIndexOf('/');
+            if (cut != -1) {
+                result = result.substring(cut + 1);
+            }
+        }
+        return result != null ? result : ("temp_file_" + System.currentTimeMillis());
+    }
+
+    /**
+     * 获取文件从Uri
+     * @param context 上下文
+     * @param uri 图片Uri
+     * @return 转换后的File对象，失败返回null
+     */
+    public static File getFileFromUri(Context context, Uri uri) {
+        return uriToFile(context, uri);
     }
 }
