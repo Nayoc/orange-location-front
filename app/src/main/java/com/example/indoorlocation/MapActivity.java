@@ -1,20 +1,23 @@
 package com.example.indoorlocation;
 
-import android.annotation.SuppressLint;
+import static com.example.indoorlocation.SpaceManagementActivity.JSON;
+
 import android.app.Activity;
+import android.app.AlertDialog;
 import android.content.Intent;
 import android.net.Uri;
 import android.os.Bundle;
 import android.os.Handler;
 import android.text.Editable;
+import android.text.TextUtils;
 import android.text.TextWatcher;
+import android.view.LayoutInflater;
 import android.view.View;
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.ImageButton;
-import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.Spinner;
@@ -26,23 +29,20 @@ import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.appcompat.app.AppCompatActivity;
 
 import com.bumptech.glide.Glide;
+import com.bumptech.glide.request.RequestOptions;
 import com.example.indoorlocation.constant.HttpConstant;
 import com.example.indoorlocation.model.Space;
 import com.example.indoorlocation.util.FileUtil;
+import com.example.indoorlocation.view.ZoomableImageView;
 import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
 
 import org.json.JSONObject;
 
 import java.io.File;
-import java.io.IOException;
 import java.lang.reflect.Type;
-import java.util.ArrayList;
-import java.util.List;
 import java.util.concurrent.TimeUnit;
 
-import okhttp3.Call;
-import okhttp3.Callback;
 import okhttp3.MediaType;
 import okhttp3.MultipartBody;
 import okhttp3.OkHttpClient;
@@ -58,7 +58,10 @@ public class MapActivity extends AppCompatActivity {
     private TextView tvSpaceName;
     private ImageButton btnBack;
     private LinearLayout layoutUpload;
-    private ImageView ivMap;
+    private ZoomableImageView ivMap;
+    private Button btnReset;
+    //    private TextView tvDimensions;
+    private TextView btnBuildCoord;
     private Button btnUploadMap;
     private TextView tvLog;
     private ScrollView scrollViewLog;
@@ -67,11 +70,15 @@ public class MapActivity extends AppCompatActivity {
     private Spinner spinnerSampleCount, spinnerMode;
     private ImageButton btnCollect;
     private Button btnStart;
+    // 弹窗
+    private AlertDialog buildCoordDialog;
 
     // 数据
     private String spaceId;
     private String spaceName;
     private String mapUrl = "";
+    private double scaleX;
+    private double scaleRate;
     private boolean hasMap = false;
     private boolean isCollecting = false;
     private boolean isPositioning = false;
@@ -127,6 +134,9 @@ public class MapActivity extends AppCompatActivity {
         btnBack = findViewById(R.id.btn_back);
         layoutUpload = findViewById(R.id.layout_upload);
         ivMap = findViewById(R.id.iv_map);
+        btnReset = findViewById(R.id.btn_reset);
+//        tvDimensions = findViewById(R.id.tv_dimensions);
+        btnBuildCoord = findViewById(R.id.btn_build_coord);
         btnUploadMap = findViewById(R.id.btn_upload_map);
         tvLog = findViewById(R.id.tv_log);
         scrollViewLog = findViewById(R.id.scrollView_log);
@@ -160,6 +170,10 @@ public class MapActivity extends AppCompatActivity {
 
         // 上传地图按钮
         btnUploadMap.setOnClickListener(v -> openImagePicker());
+
+        btnBuildCoord.setOnClickListener(v -> showBuildCoordDialog());
+
+        btnReset.setOnClickListener(v -> ivMap.reset());
 
         // 采集次数选择
         spinnerSampleCount.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
@@ -239,8 +253,14 @@ public class MapActivity extends AppCompatActivity {
                 Response response = client.newCall(request).execute();
                 if (response.isSuccessful()) {
                     String responseData = response.body().string();
-                    JSONObject jsonObject = new JSONObject(responseData);
-                    String mapUrl = jsonObject.optString("spacePlanUrl", "");
+                    Type listType = new TypeToken<Space>() {
+                    }.getType();
+                    Space space = gson.fromJson(responseData, listType);
+                    scaleX = space.getScaleX();
+                    scaleRate = space.getScaleRate();
+
+//                    tvDimensions.setText("横宽比:" + space.getScaleRate() + "\t 长:" + space.getScaleX() + "米");
+                    String mapUrl = space.getSpacePlanUrl();
 
                     runOnUiThread(() -> {
                         if (!mapUrl.isEmpty()) {
@@ -273,6 +293,7 @@ public class MapActivity extends AppCompatActivity {
         // 使用Glide加载地图图片
         Glide.with(this)
                 .load(mapUrl)
+                .apply(RequestOptions.placeholderOf(R.color.white).error(R.color.white))
                 .placeholder(R.drawable.ic_launcher_foreground)
                 .error(R.drawable.ic_launcher_foreground)
                 .into(ivMap);
@@ -292,6 +313,89 @@ public class MapActivity extends AppCompatActivity {
         intent.addCategory(Intent.CATEGORY_OPENABLE);
         imagePickerLauncher.launch(intent);
     }
+
+    private void showBuildCoordDialog() {
+        AlertDialog.Builder builder = new AlertDialog.Builder(this);
+        builder.setTitle("重建坐标系");
+        builder.setCancelable(false);
+        builder.setNegativeButton("取消", null);
+
+        LayoutInflater inflater = getLayoutInflater();
+        View view = inflater.inflate(R.layout.dialog_build_coord, null);
+
+        // 获取控件引用
+        EditText editTextWidth = view.findViewById(R.id.et_space_width);
+        TextView viewTextRatio = view.findViewById(R.id.tv_space_ratio);
+        Button buildButton = view.findViewById(R.id.btn_build);
+
+        editTextWidth.setText(String.valueOf(scaleX));
+        viewTextRatio.setText(String.valueOf(scaleRate));
+
+
+        // 保存按钮点击事件（使用spacePlan字段）
+        buildButton.setOnClickListener(v -> {
+            Double editScaleX = Double.valueOf(editTextWidth.getText().toString().trim());
+
+            new Thread(()->{
+                try {
+
+                    // 修改数据
+                    Space editSpace = new Space();
+                    editSpace.setId(spaceId);
+                    editSpace.setScaleX(editScaleX);
+                    String json = gson.toJson(editSpace);
+                    RequestBody body = RequestBody.create(json, JSON);
+
+                    Request request = new Request.Builder()
+                            .url(HttpConstant.BASE_URL)
+                            .put(body)
+                            .build();
+
+                    Response response = client.newCall(request).execute();
+                    if (response.isSuccessful()) {
+                        runOnUiThread(() -> {
+                            scaleX = editScaleX;
+                            // 开始绘制坐标系
+
+                            if (buildCoordDialog != null && buildCoordDialog.isShowing()) {
+                                buildCoordDialog.dismiss();
+                            }
+                        });
+
+                    } else {
+                        runOnUiThread(() -> {
+                            appendLog("重建坐标系失败: " + response.code());
+
+                            if (buildCoordDialog != null && buildCoordDialog.isShowing()) {
+                                buildCoordDialog.dismiss();
+                            }
+                        });
+                    }
+
+                } catch (Exception e) {
+                    runOnUiThread(() -> {
+                        appendLog("重建坐标系失败: " + e.getMessage());
+
+                        if (buildCoordDialog != null && buildCoordDialog.isShowing()) {
+                            buildCoordDialog.dismiss();
+                        }
+                    });
+                }
+            }).start();;
+
+        });
+
+        buildCoordDialog = builder.setView(view)
+                .setCancelable(false) // 关键：禁止外部点击关闭
+                .setNegativeButton("取消", (dialog, id) -> {
+                    dialog.dismiss();
+                })
+                .create();
+
+        buildCoordDialog.show();
+
+    }
+
 
     private void uploadMapImage(Uri imageUri) {
         appendLog("开始上传地图...");

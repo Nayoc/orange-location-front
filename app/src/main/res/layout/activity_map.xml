@@ -35,6 +35,45 @@
             android:textColor="#333333"
             android:textStyle="bold" />
 
+<!--        <TextView-->
+<!--            android:id="@+id/tv_dimensions"-->
+<!--            android:layout_width="wrap_content"-->
+<!--            android:layout_height="wrap_content"-->
+<!--            android:text="横宽比: X"-->
+<!--            android:textSize="14sp"-->
+<!--            app:layout_constraintStart_toEndOf="@id/tv_space_name"-->
+<!--            app:layout_constraintTop_toTopOf="parent"-->
+<!--            app:layout_constraintBottom_toBottomOf="@id/tv_space_name"-->
+<!--            android:layout_marginStart="16dp" />-->
+
+        <Button
+            android:id="@+id/btn_build_coord"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="重建坐标系"
+            android:textColor="#ffffff"
+            android:backgroundTint="#007AFF"
+            android:textSize="14sp"
+            app:layout_constraintStart_toEndOf="@id/tv_space_name"
+            app:layout_constraintTop_toTopOf="parent"
+            app:layout_constraintBottom_toBottomOf="@id/tv_space_name"
+            app:layout_constraintEnd_toEndOf="parent"
+            android:layout_marginStart="16dp" />
+
+        <!-- 复位按钮 -->
+        <Button
+            android:id="@+id/btn_reset"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="复位"
+            android:textColor="#ffffff"
+            android:backgroundTint="#007AFF"
+            android:textSize="14sp"
+            app:layout_constraintStart_toEndOf="@id/btn_build_coord"
+            app:layout_constraintTop_toTopOf="parent"
+            app:layout_constraintBottom_toBottomOf="@id/tv_space_name"
+            app:layout_constraintEnd_toEndOf="parent"
+            android:layout_marginStart="16dp" />
     </LinearLayout>
 
     <!-- 地图区域 -->
@@ -46,7 +85,34 @@
         android:background="#ffffff"
         android:elevation="4dp"
         android:clipToPadding="false">
-
+        <!-- 自定义的可缩放平移ImageView -->
+        <com.example.indoorlocation.view.ZoomableImageView
+            android:id="@+id/iv_map"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:scaleType="matrix"
+            android:visibility="gone"
+            android:contentDescription="地图" />
+        <!-- 复位按钮 -->
+<!--        <Button-->
+<!--            android:id="@+id/btn_reset"-->
+<!--            android:layout_width="wrap_content"-->
+<!--            android:layout_height="wrap_content"-->
+<!--            android:layout_gravity="top|right"-->
+<!--            android:layout_margin="16dp"-->
+<!--            android:text="复位"-->
+<!--            android:textColor="#ffffff"-->
+<!--            android:backgroundTint="#007AFF" />-->
+<!--        &lt;!&ndash; 显示尺寸信息的文本 &ndash;&gt;-->
+<!--        <TextView-->
+<!--            android:id="@+id/tv_dimensions"-->
+<!--            android:layout_width="wrap_content"-->
+<!--            android:layout_height="wrap_content"-->
+<!--            android:layout_gravity="top|left"-->
+<!--            android:layout_margin="16dp"-->
+<!--            android:text="横宽比:X\n长:Y米"-->
+<!--            android:textSize="14sp"-->
+<!--            android:textColor="#666666" />-->
         <!-- 上传地图按钮 -->
         <LinearLayout
             android:id="@+id/layout_upload"
@@ -55,7 +121,6 @@
             android:orientation="vertical"
             android:gravity="center"
             android:visibility="visible">
-
             <Button
                 android:id="@+id/btn_upload_map"
                 android:layout_width="wrap_content"
@@ -65,18 +130,7 @@
                 android:backgroundTint="#007AFF"
                 android:paddingHorizontal="32dp"
                 android:paddingVertical="16dp" />
-
         </LinearLayout>
-
-        <!-- 地图图片 -->
-        <ImageView
-            android:id="@+id/iv_map"
-            android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:scaleType="fitCenter"
-            android:visibility="gone"
-            android:contentDescription="地图" />
-
     </FrameLayout>
 
     <!-- 日志输出面板 -->

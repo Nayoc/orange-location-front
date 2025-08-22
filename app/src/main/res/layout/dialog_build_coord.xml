@@ -1,0 +1,82 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:padding="16dp">
+
+    <!-- 空间比例尺宽度（输入框缩短） -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="24dp"
+        android:gravity="center_vertical">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginEnd="8dp"
+            android:text="空间比例尺宽度(米)："
+            android:textColor="#666666"
+            android:textSize="14sp" />  <!-- 与输入框保持间距 -->
+
+        <EditText
+            android:id="@+id/et_space_width"
+            android:layout_width="120dp"
+            android:layout_height="wrap_content"
+            android:hint="请输入实际宽度"
+            android:inputType="numberDecimal"
+            android:maxLines="1"
+            android:textSize="14sp" />  <!-- 强制不换行 -->
+    </LinearLayout>
+
+    <!-- 图片宽高比 -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="24dp"
+        android:gravity="center_vertical">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginEnd="8dp"
+            android:text="图片宽高比："
+            android:textColor="#666666"
+            android:textSize="14sp" />
+
+        <TextView
+            android:id="@+id/tv_space_ratio"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="0.82"
+            android:textColor="#666666"
+            android:textSize="14sp" />
+    </LinearLayout>
+
+    <!-- 提示文字（不换行） -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="24dp"
+        android:gravity="start">  <!-- 左对齐，避免宽度被拉伸 -->
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="*重建坐标系后历史数据会全部失效"
+            android:textColor="@android:color/holo_red_dark"
+            android:textSize="14sp" />
+    </LinearLayout>
+
+    <!-- 底部保存按钮 -->
+    <Button
+        android:id="@+id/btn_build"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:backgroundTint="#1976D2"
+        android:text="确认"
+        android:textColor="@android:color/white"
+        android:textSize="16sp" />
+
+</LinearLayout>

@@ -53,7 +53,7 @@ public class SpaceAdapter extends RecyclerView.Adapter<SpaceAdapter.SpaceViewHol
         holder.latitude.setText("纬度：" + space.getLatitude());
 
         // 设置在线状态
-        if (space.getAccess() != null && space.getAccess()) {
+        if (space.getIsAccess() != null && space.getIsAccess()) {
             holder.spaceStatus.setText("在线");
             holder.spaceStatus.setBackgroundResource(R.drawable.status_online);
             holder.spaceStatus.setTextColor(holder.itemView.getContext().getResources().getColor(R.color.onlineColor));
