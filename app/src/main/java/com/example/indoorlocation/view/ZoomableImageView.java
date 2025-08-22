@@ -1,8 +1,12 @@
 package com.example.indoorlocation.view;
 
 import android.content.Context;
+import android.graphics.Canvas;
+import android.graphics.Color;
 import android.graphics.Matrix;
+import android.graphics.Paint;
 import android.graphics.PointF;
+import android.graphics.RectF;
 import android.util.AttributeSet;
 import android.view.MotionEvent;
 import android.view.View;
@@ -13,7 +17,16 @@ public class ZoomableImageView extends androidx.appcompat.widget.AppCompatImageV
     private static final float MIN_SCALE_RATIO = 0.5f;
     private static final float MAX_SCALE_RATIO = 2f;
 
-    private float initialScale = 1.0f; // 初始缩放比例（默认1.0，即原始尺寸）
+    // 坐标系相关变量
+    private boolean drawCoordinateSystem = false;
+    private float maxX;
+    private float maxY;
+    private Paint axisPaint;
+    private Paint gridPaint;
+    private Paint textPaint;
+    private float gridInterval = 1f; // 网格间隔（单位：米）
+
+    private float initialScale = 1.0f;
     private Matrix matrix = new Matrix();
     private Matrix savedMatrix = new Matrix();
     private static final int NONE = 0;
@@ -41,14 +54,99 @@ public class ZoomableImageView extends androidx.appcompat.widget.AppCompatImageV
 
     private void init() {
         setScaleType(ScaleType.MATRIX);
-        // 初始化时记录初始缩放（默认1.0）
         initialScale = 1.0f;
+
+        // 初始化坐标系画笔
+        initCoordinatePaints();
+    }
+
+    private void initCoordinatePaints() {
+        // 坐标轴画笔
+        axisPaint = new Paint();
+        axisPaint.setColor(Color.RED);
+        axisPaint.setStrokeWidth(3f);
+        axisPaint.setAntiAlias(true);
+
+        // 网格线画笔
+        gridPaint = new Paint();
+        gridPaint.setColor(Color.LTGRAY);
+        gridPaint.setStrokeWidth(1f);
+        gridPaint.setAntiAlias(true);
+        gridPaint.setStyle(Paint.Style.STROKE);
+
+        // 文本画笔
+        textPaint = new Paint();
+        textPaint.setColor(Color.BLACK);
+        textPaint.setTextSize(30f);
+        textPaint.setAntiAlias(true);
+    }
+
+    @Override
+    protected void onDraw(Canvas canvas) {
+        super.onDraw(canvas);
+        // 绘制坐标系（在图片之上）
+        if (drawCoordinateSystem && getDrawable() != null) {
+            drawCoordinateSystem(canvas);
+        }
+    }
+
+    private void drawCoordinateSystem(Canvas canvas) {
+        // 获取图片原始尺寸
+        int drawableWidth = getDrawable().getIntrinsicWidth();
+        int drawableHeight = getDrawable().getIntrinsicHeight();
+
+        // 获取当前矩阵值
+        float[] values = new float[9];
+        matrix.getValues(values);
+        float scaleX = values[Matrix.MSCALE_X];
+        float scaleY = values[Matrix.MSCALE_Y];
+        float transX = values[Matrix.MTRANS_X];
+        float transY = values[Matrix.MTRANS_Y];
+
+        // 计算原点（图片左下角）在屏幕上的位置
+        float originX = transX;
+        float originY = transY + drawableHeight * scaleY;
+
+        // 计算坐标轴终点（图片右上角）
+        float endX = transX + drawableWidth * scaleX;
+        float endY = transY;
+
+        // 绘制X轴和Y轴
+        canvas.drawLine(originX, originY, endX, originY, axisPaint); // X轴
+        canvas.drawLine(originX, originY, originX, endY, axisPaint); // Y轴
+
+        // 计算实际米与像素的比例
+        float meterToPixelX = drawableWidth * scaleX / maxX;
+        float meterToPixelY = drawableHeight * scaleY / maxY;
+
+        // 绘制X轴网格和刻度
+        for (int i = 0; i <= maxX; i += gridInterval) {
+            float x = originX + i * meterToPixelX;
+
+            // 绘制垂直线
+            canvas.drawLine(x, originY, x, endY, gridPaint);
+
+            // 绘制刻度和文字
+            canvas.drawLine(x, originY - 10, x, originY + 10, axisPaint);
+            canvas.drawText(String.valueOf(i), x - 10, originY + 40, textPaint);
+        }
+
+        // 绘制Y轴网格和刻度
+        for (int i = 0; i <= maxY; i += gridInterval) {
+            float y = originY - i * meterToPixelY;
+
+            // 绘制水平线
+            canvas.drawLine(originX, y, endX, y, gridPaint);
+
+            // 绘制刻度和文字
+            canvas.drawLine(originX - 10, y, originX + 10, y, axisPaint);
+            canvas.drawText(String.valueOf(i), originX - 40, y + 10, textPaint);
+        }
     }
 
     @Override
     public boolean onTouchEvent(MotionEvent event) {
         switch (event.getAction() & MotionEvent.ACTION_MASK) {
-
             case MotionEvent.ACTION_DOWN:
                 savedMatrix.set(matrix);
                 start.set(event.getX(), event.getY());
@@ -68,34 +166,28 @@ public class ZoomableImageView extends androidx.appcompat.widget.AppCompatImageV
                 break;
             case MotionEvent.ACTION_MOVE:
                 if (mode == DRAG) {
-                    // 处理平移逻辑
                     matrix.set(savedMatrix);
-                    float dx = event.getX() - start.x; // 计算X方向平移距离
-                    float dy = event.getY() - start.y; // 计算Y方向平移距离
-                    matrix.postTranslate(dx, dy); // 应用平移
-                    checkTranslation(); // 限制平移范围
+                    float dx = event.getX() - start.x;
+                    float dy = event.getY() - start.y;
+                    matrix.postTranslate(dx, dy);
+                    checkTranslation();
                 } else if (mode == ZOOM) {
-                    // 处理缩放逻辑
                     float newDist = spacing(event);
                     if (newDist > 10f) {
                         savedMatrix.set(matrix);
                         float scale = newDist / oldDist;
 
-                        // 降低缩放灵敏度：限制每次缩放幅度（最大1.1倍/最小0.9倍）
-                        // 避免因手势微小变化导致缩放幅度过大
                         if (scale > 1.1f) {
-                            scale = 1.1f; // 每次最大放大1.1倍
+                            scale = 1.1f;
                         } else if (scale < 0.9f) {
-                            scale = 0.9f; // 每次最大缩小到0.9倍
+                            scale = 0.9f;
                         }
 
-                        // 计算当前缩放比例（基于初始缩放）
                         Matrix tempMatrix = new Matrix(matrix);
                         float[] values = new float[9];
                         tempMatrix.getValues(values);
                         float currentScale = values[Matrix.MSCALE_X];
 
-                        // 限制缩放范围：初始的0.5~2倍
                         float targetScale = currentScale * scale;
                         if (targetScale < initialScale * MIN_SCALE_RATIO) {
                             scale = (initialScale * MIN_SCALE_RATIO) / currentScale;
@@ -104,9 +196,9 @@ public class ZoomableImageView extends androidx.appcompat.widget.AppCompatImageV
                         }
 
                         matrix.set(savedMatrix);
-                        matrix.postScale(scale, scale, mid.x, mid.y); // 基于双指中点缩放
-                        checkScale(); // 限制缩放范围
-                        checkTranslation(); // 限制平移范围（缩放后可能需要重新调整平移）
+                        matrix.postScale(scale, scale, mid.x, mid.y);
+                        checkScale();
+                        checkTranslation();
                     }
                 }
                 break;
@@ -144,7 +236,6 @@ public class ZoomableImageView extends androidx.appcompat.widget.AppCompatImageV
         float viewWidth = getWidth();
         float viewHeight = getHeight();
 
-        // 限制平移范围：不超过图片对应尺寸的一半
         if (transX > drawableWidth / 2 - viewWidth / 2) {
             transX = drawableWidth / 2 - viewWidth / 2;
         } else if (transX < -drawableWidth / 2 + viewWidth / 2) {
@@ -166,7 +257,6 @@ public class ZoomableImageView extends androidx.appcompat.widget.AppCompatImageV
         matrix.getValues(values);
         float currentScale = values[Matrix.MSCALE_X];
 
-        // 限制缩放范围：基于初始缩放的0.5~2倍
         if (currentScale < initialScale * MIN_SCALE_RATIO) {
             matrix.setScale(initialScale * MIN_SCALE_RATIO, initialScale * MIN_SCALE_RATIO);
         } else if (currentScale > initialScale * MAX_SCALE_RATIO) {
@@ -179,5 +269,18 @@ public class ZoomableImageView extends androidx.appcompat.widget.AppCompatImageV
         matrix.setScale(1f, 1f);
         matrix.postTranslate(0, 0);
         setImageMatrix(matrix);
+    }
+
+    // 坐标系控制方法
+    public void setCoordinateSystem(float maxX, float maxY) {
+        this.maxX = (float) Math.ceil(maxX); // 向上取整
+        this.maxY = (float) Math.ceil(maxY); // 向上取整
+        this.drawCoordinateSystem = true;
+        invalidate(); // 重绘
+    }
+
+    public void clearCoordinateSystem() {
+        this.drawCoordinateSystem = false;
+        invalidate(); // 重绘
     }
 }

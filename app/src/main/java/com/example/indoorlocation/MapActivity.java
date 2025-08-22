@@ -353,9 +353,19 @@ public class MapActivity extends AppCompatActivity {
 
                     Response response = client.newCall(request).execute();
                     if (response.isSuccessful()) {
+                        scaleX = editScaleX;
+
                         runOnUiThread(() -> {
-                            scaleX = editScaleX;
-                            // 开始绘制坐标系
+                            // 清除之前的坐标系
+                            ivMap.clearCoordinateSystem();
+
+                            // 计算Y轴最大值 (scaleX / scaleRate)
+                            double maxYValue = scaleX / scaleRate;
+
+                            // 设置新的坐标系
+                            ivMap.setCoordinateSystem((float) scaleX, (float) maxYValue);
+
+                            appendLog("坐标系重建完成，X轴最大值: " + scaleX + ", Y轴最大值: " + maxYValue);
 
                             if (buildCoordDialog != null && buildCoordDialog.isShowing()) {
                                 buildCoordDialog.dismiss();
