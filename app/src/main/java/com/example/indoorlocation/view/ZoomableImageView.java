@@ -6,10 +6,8 @@ import android.graphics.Color;
 import android.graphics.Matrix;
 import android.graphics.Paint;
 import android.graphics.PointF;
-import android.graphics.RectF;
 import android.util.AttributeSet;
 import android.view.MotionEvent;
-import android.view.View;
 
 import androidx.annotation.Nullable;
 
@@ -26,7 +24,12 @@ public class ZoomableImageView extends androidx.appcompat.widget.AppCompatImageV
     private Paint textPaint;
     private float gridInterval = 1f; // 网格间隔（单位：米）
 
-    private float initialScale = 1.0f;
+    // 标记点相关
+    private PointF markerPoint = null; // 标记点坐标（米）
+    private Paint curMarkerPaint; // 当前标记点画笔
+    private Paint hisMarkerPaint; // 历史标记点画笔
+
+    private float initialScale = 1.0f; // 初始缩放比例（默认1.0，即原始尺寸）
     private Matrix matrix = new Matrix();
     private Matrix savedMatrix = new Matrix();
     private static final int NONE = 0;
@@ -36,6 +39,13 @@ public class ZoomableImageView extends androidx.appcompat.widget.AppCompatImageV
     private PointF start = new PointF();
     private PointF mid = new PointF();
     private float oldDist = 1f;
+
+    // 点击监听接口
+    public interface OnMapClickListener {
+        void onMapClick(float x, float y); // x,y为米坐标
+    }
+
+    private OnMapClickListener onMapClickListener;
 
     public ZoomableImageView(Context context) {
         super(context);
@@ -58,6 +68,12 @@ public class ZoomableImageView extends androidx.appcompat.widget.AppCompatImageV
 
         // 初始化坐标系画笔
         initCoordinatePaints();
+
+        // 初始化标记点画笔
+        curMarkerPaint = new Paint();
+        curMarkerPaint.setColor(Color.RED);
+        curMarkerPaint.setStyle(Paint.Style.FILL);
+        curMarkerPaint.setAntiAlias(true);
     }
 
     private void initCoordinatePaints() {
@@ -72,7 +88,6 @@ public class ZoomableImageView extends androidx.appcompat.widget.AppCompatImageV
         gridPaint.setColor(Color.LTGRAY);
         gridPaint.setStrokeWidth(1f);
         gridPaint.setAntiAlias(true);
-        gridPaint.setStyle(Paint.Style.STROKE);
 
         // 文本画笔
         textPaint = new Paint();
@@ -87,6 +102,11 @@ public class ZoomableImageView extends androidx.appcompat.widget.AppCompatImageV
         // 绘制坐标系（在图片之上）
         if (drawCoordinateSystem && getDrawable() != null) {
             drawCoordinateSystem(canvas);
+        }
+
+        // 绘制标记点
+        if (markerPoint != null && getDrawable() != null) {
+            drawMarker(canvas);
         }
     }
 
@@ -144,6 +164,35 @@ public class ZoomableImageView extends androidx.appcompat.widget.AppCompatImageV
         }
     }
 
+    private void drawMarker(Canvas canvas) {
+        // 获取图片原始尺寸
+        int drawableWidth = getDrawable().getIntrinsicWidth();
+        int drawableHeight = getDrawable().getIntrinsicHeight();
+
+        // 获取当前矩阵值
+        float[] values = new float[9];
+        matrix.getValues(values);
+        float scaleX = values[Matrix.MSCALE_X];
+        float scaleY = values[Matrix.MSCALE_Y];
+        float transX = values[Matrix.MTRANS_X];
+        float transY = values[Matrix.MTRANS_Y];
+
+        // 计算原点（图片左下角）在屏幕上的位置
+        float originX = transX;
+        float originY = transY + drawableHeight * scaleY;
+
+        // 计算实际米与像素的比例
+        float meterToPixelX = drawableWidth * scaleX / maxX;
+        float meterToPixelY = drawableHeight * scaleY / maxY;
+
+        // 计算标记点在屏幕上的位置
+        float screenX = originX + markerPoint.x * meterToPixelX;
+        float screenY = originY - markerPoint.y * meterToPixelY;
+
+        // 绘制红点标记
+        canvas.drawCircle(screenX, screenY, 10 * Math.max(scaleX, scaleY), curMarkerPaint);
+    }
+
     @Override
     public boolean onTouchEvent(MotionEvent event) {
         switch (event.getAction() & MotionEvent.ACTION_MASK) {
@@ -161,33 +210,44 @@ public class ZoomableImageView extends androidx.appcompat.widget.AppCompatImageV
                 }
                 break;
             case MotionEvent.ACTION_UP:
+                // 处理单击事件（如果不是拖动或缩放）
+                if (mode == DRAG && isSingleTap(event)) {
+                    handleMapClick(event.getX(), event.getY());
+                }
+                mode = NONE;
+                break;
             case MotionEvent.ACTION_POINTER_UP:
                 mode = NONE;
                 break;
             case MotionEvent.ACTION_MOVE:
                 if (mode == DRAG) {
+                    // 处理平移逻辑
                     matrix.set(savedMatrix);
-                    float dx = event.getX() - start.x;
-                    float dy = event.getY() - start.y;
-                    matrix.postTranslate(dx, dy);
-                    checkTranslation();
+                    float dx = event.getX() - start.x; // 计算X方向平移距离
+                    float dy = event.getY() - start.y; // 计算Y方向平移距离
+                    matrix.postTranslate(dx, dy); // 应用平移
+                    checkTranslation(); // 限制平移范围
                 } else if (mode == ZOOM) {
+                    // 处理缩放逻辑
                     float newDist = spacing(event);
                     if (newDist > 10f) {
                         savedMatrix.set(matrix);
                         float scale = newDist / oldDist;
 
+                        // 降低缩放灵敏度：限制每次缩放幅度
                         if (scale > 1.1f) {
                             scale = 1.1f;
                         } else if (scale < 0.9f) {
                             scale = 0.9f;
                         }
 
+                        // 计算当前缩放比例
                         Matrix tempMatrix = new Matrix(matrix);
                         float[] values = new float[9];
                         tempMatrix.getValues(values);
                         float currentScale = values[Matrix.MSCALE_X];
 
+                        // 限制缩放范围
                         float targetScale = currentScale * scale;
                         if (targetScale < initialScale * MIN_SCALE_RATIO) {
                             scale = (initialScale * MIN_SCALE_RATIO) / currentScale;
@@ -207,10 +267,47 @@ public class ZoomableImageView extends androidx.appcompat.widget.AppCompatImageV
         return true;
     }
 
-    // 检查缩放和平移是否超出限制
-    private void checkScaleAndTranslation() {
-        checkScale();
-        checkTranslation();
+    // 判断是否为单击事件（移动距离很小）
+    private boolean isSingleTap(MotionEvent event) {
+        float dx = Math.abs(event.getX() - start.x);
+        float dy = Math.abs(event.getY() - start.y);
+        return dx < 10 && dy < 10;
+    }
+
+    // 处理地图点击事件，计算点击位置对应的坐标
+    private void handleMapClick(float x, float y) {
+        if (!drawCoordinateSystem || getDrawable() == null) return;
+
+        int drawableWidth = getDrawable().getIntrinsicWidth();
+        int drawableHeight = getDrawable().getIntrinsicHeight();
+
+        float[] values = new float[9];
+        matrix.getValues(values);
+        float scaleX = values[Matrix.MSCALE_X];
+        float scaleY = values[Matrix.MSCALE_Y];
+        float transX = values[Matrix.MTRANS_X];
+        float transY = values[Matrix.MTRANS_Y];
+
+        // 计算原点（图片左下角）在屏幕上的位置
+        float originX = transX;
+        float originY = transY + drawableHeight * scaleY;
+
+        // 计算实际米与像素的比例
+        float pixelToMeterX = maxX / (drawableWidth * scaleX);
+        float pixelToMeterY = maxY / (drawableHeight * scaleY);
+
+        // 计算点击位置对应的米坐标
+        float coordX = (x - originX) * pixelToMeterX;
+        float coordY = (originY - y) * pixelToMeterY;
+
+        // 限制坐标在有效范围内
+        coordX = Math.max(0, Math.min(maxX, coordX));
+        coordY = Math.max(0, Math.min(maxY, coordY));
+
+        // 回调点击事件
+        if (onMapClickListener != null) {
+            onMapClickListener.onMapClick(coordX, coordY);
+        }
     }
 
     private float spacing(MotionEvent event) {
@@ -236,6 +333,7 @@ public class ZoomableImageView extends androidx.appcompat.widget.AppCompatImageV
         float viewWidth = getWidth();
         float viewHeight = getHeight();
 
+        // 限制平移范围
         if (transX > drawableWidth / 2 - viewWidth / 2) {
             transX = drawableWidth / 2 - viewWidth / 2;
         } else if (transX < -drawableWidth / 2 + viewWidth / 2) {
@@ -257,6 +355,7 @@ public class ZoomableImageView extends androidx.appcompat.widget.AppCompatImageV
         matrix.getValues(values);
         float currentScale = values[Matrix.MSCALE_X];
 
+        // 限制缩放范围
         if (currentScale < initialScale * MIN_SCALE_RATIO) {
             matrix.setScale(initialScale * MIN_SCALE_RATIO, initialScale * MIN_SCALE_RATIO);
         } else if (currentScale > initialScale * MAX_SCALE_RATIO) {
@@ -282,5 +381,26 @@ public class ZoomableImageView extends androidx.appcompat.widget.AppCompatImageV
     public void clearCoordinateSystem() {
         this.drawCoordinateSystem = false;
         invalidate(); // 重绘
+    }
+
+    // 标记点控制方法
+    public void setMarkerPoint(float x, float y) {
+        // 检查坐标是否在有效范围内
+        if (x >= 0 && x <= maxX && y >=0 && y <= maxY) {
+            this.markerPoint = new PointF(x, y);
+        } else {
+            this.markerPoint = null;
+        }
+        invalidate();
+    }
+
+    public void clearMarker() {
+        this.markerPoint = null;
+        invalidate();
+    }
+
+    // 设置点击监听器
+    public void setOnMapClickListener(OnMapClickListener listener) {
+        this.onMapClickListener = listener;
     }
 }

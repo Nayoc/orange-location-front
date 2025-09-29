@@ -16,6 +16,7 @@ import android.widget.Button;
 import android.widget.EditText;
 import android.widget.ImageView;
 import android.widget.Toast;
+import android.Manifest;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -64,12 +65,25 @@ public class SpaceManagementActivity extends Activity {
     private static final int REQUEST_STORAGE_PERMISSION = 102; // 存储权限请求码
     public static final MediaType JSON = MediaType.get("application/json; charset=utf-8");
 
+    private static final int REQUEST_PERMISSIONS_CODE = 1001;
+
+    // 需要的权限集合
+    // 需要的权限集合
+    private final String[] appPermissions = {
+            Manifest.permission.ACCESS_FINE_LOCATION,
+            Manifest.permission.ACCESS_COARSE_LOCATION,
+            Manifest.permission.READ_PHONE_STATE,
+            // Android 13+ 扫描 Wi-Fi
+            Manifest.permission.NEARBY_WIFI_DEVICES
+    };
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
 
         super.onCreate(savedInstanceState);
         setContentView(R.layout.space_main);
+
+        checkAndRequestPermissions();
 
         // 初始化控件
         recyclerView = findViewById(R.id.space_recycler_view);
@@ -116,11 +130,31 @@ public class SpaceManagementActivity extends Activity {
         fetchSpaces();
     }
 
+    private void checkAndRequestPermissions() {
+        List<String> listPermissionsNeeded = new ArrayList<>();
+
+        for (String perm : appPermissions) {
+            if (ContextCompat.checkSelfPermission(this, perm)
+                    != PackageManager.PERMISSION_GRANTED) {
+                listPermissionsNeeded.add(perm);
+            }
+        }
+
+        if (!listPermissionsNeeded.isEmpty()) {
+            ActivityCompat.requestPermissions(
+                    this,
+                    listPermissionsNeeded.toArray(new String[0]),
+                    REQUEST_PERMISSIONS_CODE
+            );
+        }
+    }
+
+
     // 获取空间列表
     private void fetchSpaces() {
 
         Request request = new Request.Builder()
-                .url(HttpConstant.BASE_URL)
+                .url(HttpConstant.SPACE_URL)
                 .build();
 
         client.newCall(request).enqueue(new Callback() {
@@ -177,7 +211,7 @@ public class SpaceManagementActivity extends Activity {
                 }
 
                 Request request = new Request.Builder()
-                        .url(HttpConstant.BASE_URL)
+                        .url(HttpConstant.SPACE_URL)
                         .post(builder.build())
                         .build();
 
@@ -209,7 +243,7 @@ public class SpaceManagementActivity extends Activity {
     // 删除空间
     private void deleteSpace(String spaceId, int position) {
         Request request = new Request.Builder()
-                .url(HttpConstant.BASE_URL + "/" + spaceId)
+                .url(HttpConstant.SPACE_URL + "/" + spaceId)
                 .delete()
                 .build();
 
@@ -349,13 +383,6 @@ public class SpaceManagementActivity extends Activity {
             } else {
                 Toast.makeText(this, "需要存储权限才能选择图片", Toast.LENGTH_SHORT).show();
             }
-        } else if (requestCode == 1001) { // Location permission
-            if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-                // 权限已授予，可以正常使用
-                Toast.makeText(this, "定位权限已授予", Toast.LENGTH_SHORT).show();
-            } else {
-                Toast.makeText(this, "需要定位权限才能获取位置信息", Toast.LENGTH_SHORT).show();
-            }
         }
     }
 
@@ -400,7 +427,7 @@ public class SpaceManagementActivity extends Activity {
         RequestBody body = RequestBody.create(json, JSON);
 
         Request request = new Request.Builder()
-                .url(HttpConstant.BASE_URL + "/" + space.getId())
+                .url(HttpConstant.SPACE_URL + "/" + space.getId())
                 .put(body)
                 .build();
 
@@ -456,7 +483,7 @@ public class SpaceManagementActivity extends Activity {
         RequestBody body = RequestBody.create(json, JSON);
 
         Request request = new Request.Builder()
-                .url(HttpConstant.BASE_URL)
+                .url(HttpConstant.SPACE_URL)
                 .put(body)
                 .build();
 

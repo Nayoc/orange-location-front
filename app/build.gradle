@@ -3,6 +3,8 @@ plugins {
 }
 
 android {
+    apply plugin: 'com.android.application'
+
     namespace 'com.example.indoorlocation'
     compileSdk 35
 

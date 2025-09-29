@@ -200,17 +200,17 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="@string/coordinate_x"
-                    android:textSize="14sp"
+                    android:textSize="12sp"
                     android:textColor="#666666" />
 
                 <EditText
                     android:id="@+id/et_x"
-                    android:layout_width="80dp"
+                    android:layout_width="40dp"
                     android:layout_height="40dp"
                     android:layout_marginStart="8dp"
                     android:hint="@string/coordinate_default"
                     android:inputType="numberDecimal"
-                    android:textSize="14sp"
+                    android:textSize="12sp"
                     android:textAlignment="center"
                     android:backgroundTint="#ddd"
                     android:background="@android:drawable/edit_text" />
@@ -228,17 +228,17 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="@string/coordinate_y"
-                    android:textSize="14sp"
+                    android:textSize="12sp"
                     android:textColor="#666666" />
 
                 <EditText
                     android:id="@+id/et_y"
-                    android:layout_width="80dp"
+                    android:layout_width="40dp"
                     android:layout_height="40dp"
                     android:layout_marginStart="8dp"
                     android:hint="@string/coordinate_default"
                     android:inputType="numberDecimal"
-                    android:textSize="14sp"
+                    android:textSize="12sp"
                     android:textAlignment="center"
                     android:backgroundTint="#ddd"
                     android:background="@android:drawable/edit_text" />
@@ -259,30 +259,31 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="@string/collect_count"
-                    android:textSize="14sp"
+                    android:textSize="12sp"
                     android:textColor="#666666" />
 
                 <Spinner
                     android:id="@+id/spinner_sample_count"
-                    android:layout_width="80dp"
+                    android:layout_width="40dp"
                     android:layout_height="40dp"
                     android:layout_marginStart="8dp"
                     android:background="@android:drawable/spinner_background" />
 
-                <ImageButton
-                    android:id="@+id/btn_collect"
-                    android:layout_width="40dp"
-                    android:layout_height="40dp"
-                    android:layout_marginStart="8dp"
-                    android:src="@drawable/baseline_play_arrow_24"
-                    android:background="?attr/selectableItemBackgroundBorderless"
-                    android:contentDescription="@string/collect_button" />
-
             </LinearLayout>
+            <!-- 新增：构建指纹库按钮 -->
+            <Button
+                android:id="@+id/btn_build_fingerprint"
+                android:layout_width="wrap_content"
+                android:layout_height="40dp"
+                android:layout_marginStart="16dp"
+                android:text="@string/build_fingerprint"
+                android:textColor="#ffffff"
+                android:backgroundTint="#007AFF"
+                android:textSize="14sp" />
 
         </LinearLayout>
 
-        <!-- 模式选择和开始按钮 -->
+        <!-- 构建指纹库按钮 -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
