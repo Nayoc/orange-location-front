@@ -8,6 +8,7 @@ import android.app.AlertDialog;
 import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
+import android.graphics.PointF;
 import android.net.Uri;
 import android.net.wifi.WifiManager;
 import android.os.Build;
@@ -44,9 +45,7 @@ import com.example.indoorlocation.api.req.CollectionReq;
 import com.example.indoorlocation.constant.HttpConstant;
 import com.example.indoorlocation.constant.SingleSourceTypeEnum;
 import com.example.indoorlocation.model.ApDto;
-import com.example.indoorlocation.model.CellDto;
 import com.example.indoorlocation.model.Space;
-import com.example.indoorlocation.model.WifiDto;
 import com.example.indoorlocation.util.FileUtil;
 import com.example.indoorlocation.view.ZoomableImageView;
 import com.google.gson.Gson;
@@ -57,7 +56,6 @@ import org.json.JSONObject;
 import java.io.File;
 import java.lang.reflect.Type;
 import java.text.SimpleDateFormat;
-import java.time.LocalDateTime;
 import java.util.Collections;
 import java.util.Date;
 import java.util.List;
@@ -83,15 +81,20 @@ public class MapActivity extends AppCompatActivity {
     private LinearLayout layoutUpload;
     private ZoomableImageView ivMap;
     private Button btnReset;
-    private TextView btnBuildCoord;
+//    private TextView btnBuildCoord;
     private Button btnUploadMap;
     private TextView tvLog;
     private ScrollView scrollViewLog;
     private EditText etX, etY;
     private LinearLayout layoutSampleCount;
     private Spinner spinnerSampleCount, spinnerMode;
+    private List<PointF> rpTracePoints;
     private Button btnBuildFingerprint;
     private Button btnStart;
+    private Button btnRpTraceSwitch;
+    private Button btnResetData;
+
+    private Boolean isOpenRpTrace = Boolean.TRUE;
     // 弹窗
     private AlertDialog buildCoordDialog;
 
@@ -157,7 +160,7 @@ public class MapActivity extends AppCompatActivity {
         initViews();
         setupListeners();
         loadSpaceData(spaceId);
-
+        loadRpTrace();
     }
 
     private void initViews() {
@@ -166,7 +169,7 @@ public class MapActivity extends AppCompatActivity {
         layoutUpload = findViewById(R.id.layout_upload);
         ivMap = findViewById(R.id.iv_map);
         btnReset = findViewById(R.id.btn_reset);
-        btnBuildCoord = findViewById(R.id.btn_build_coord);
+//        btnBuildCoord = findViewById(R.id.btn_build_coord);
         btnUploadMap = findViewById(R.id.btn_upload_map);
         tvLog = findViewById(R.id.tv_log);
         scrollViewLog = findViewById(R.id.scrollView_log);
@@ -177,6 +180,8 @@ public class MapActivity extends AppCompatActivity {
         spinnerMode = findViewById(R.id.spinner_mode);
         btnBuildFingerprint = findViewById(R.id.btn_build_fingerprint);
         btnStart = findViewById(R.id.btn_start);
+        btnRpTraceSwitch = findViewById(R.id.btn_rp_trace_switch);
+        btnResetData = findViewById(R.id.btn_reset_data);
 
         // 设置空间名称
         tvSpaceName.setText(spaceName);
@@ -201,7 +206,7 @@ public class MapActivity extends AppCompatActivity {
         // 上传地图按钮
         btnUploadMap.setOnClickListener(v -> openImagePicker());
 
-        btnBuildCoord.setOnClickListener(v -> showBuildCoordDialog());
+//        btnBuildCoord.setOnClickListener(v -> showBuildCoordDialog());
 
         btnReset.setOnClickListener(v -> ivMap.reset());
 
@@ -285,6 +290,72 @@ public class MapActivity extends AppCompatActivity {
 
         // 开始按钮
         btnStart.setOnClickListener(v -> toggleOperation());
+
+        btnRpTraceSwitch.setOnClickListener(v-> switchRpTrace());
+
+        btnResetData.setOnClickListener(v-> showResetDataDialog());
+    }
+
+    private void showResetDataDialog() {
+        AlertDialog.Builder builder = new AlertDialog.Builder(this);
+        builder.setTitle("重置数据");
+        builder.setCancelable(false);
+        builder.setNegativeButton("取消", null);
+
+        LayoutInflater inflater = getLayoutInflater();
+        View view = inflater.inflate(R.layout.dialog_reset_data, null);
+
+        // 获取控件引用
+        Button confirmButton = view.findViewById(R.id.btn_confirm);
+
+        // 保存按钮点击事件
+        confirmButton.setOnClickListener(v -> {
+            new Thread(() -> {
+                try {
+                    // 修改数据
+                    String url = HttpConstant.SPACE_URL + "/reset" + "/" + spaceId;
+                    RequestBody body = RequestBody.create(null, "");
+
+                    Request request = new Request.Builder()
+                            .url(url)
+                            .post(body)
+                            .build();
+
+                    Response response = client.newCall(request).execute();
+
+                    if (response.isSuccessful()) {
+                        ivMap.clearRpTracePoints();
+                        runOnUiThread(() -> {
+                            buildCoordDialog.dismiss();
+                            appendLog("已重置空间所有数据");
+                        });
+
+                    } else {
+                        runOnUiThread(() -> {
+                            buildCoordDialog.dismiss();
+                            appendLog("重置空间数据失败");
+                        });
+                    }
+
+                } catch (Exception e) {
+                    runOnUiThread(() -> {
+                        buildCoordDialog.dismiss();
+                        appendLog("重置空间数据异常: " + e.getMessage());
+                    });
+                }
+            }).start();
+
+        });
+
+        buildCoordDialog = builder.setView(view)
+                .setCancelable(false)
+                .setNegativeButton("取消", (dialog, id) -> {
+                    dialog.dismiss();
+                })
+                .create();
+
+        buildCoordDialog.show();
+
     }
 
     private void updateBatchId() {
@@ -299,6 +370,7 @@ public class MapActivity extends AppCompatActivity {
         if ("采集".equals(currentMode)) {
 
             layoutSampleCount.setVisibility(View.VISIBLE);
+            btnBuildFingerprint.setVisibility(View.VISIBLE);
             btnStart.setText(isCollecting ? "停止采集" : "开始采集");
 
             // 设置按钮颜色
@@ -310,6 +382,7 @@ public class MapActivity extends AppCompatActivity {
         } else {
 
             layoutSampleCount.setVisibility(View.GONE);
+            btnBuildFingerprint.setVisibility(View.GONE);
             btnStart.setText(isPositioning ? "停止定位" : "开始定位");
             btnStart.setBackgroundTintList(getResources().getColorStateList(R.color.blue));
         }
@@ -474,6 +547,39 @@ public class MapActivity extends AppCompatActivity {
 
     }
 
+    private void loadRpTrace() {
+        new Thread(() -> {
+            try {
+                String url = HttpConstant.DATA_URL + "/rp" + "/" + spaceId;
+
+                Request request = new Request.Builder()
+                        .url(url)
+                        .build();
+
+                Response response = client.newCall(request).execute();
+                if (response.isSuccessful()) {
+                    String responseData = response.body().string();
+                    Type listType = new TypeToken<List<PointF>>(){}.getType();
+                    rpTracePoints = gson.fromJson(responseData, listType);
+
+                    runOnUiThread(() -> {
+                        ivMap.setRpTracePoints(rpTracePoints);
+                    });
+                } else {
+                    runOnUiThread(() -> {
+                        appendLog("历史rp点绘制失败");
+                    });
+                }
+
+            }catch (Exception e) {
+                runOnUiThread(() -> {
+                    appendLog("历史rp点绘制失败");
+                });
+            }
+        }).start();
+    }
+
+
     private void showBuildFingerprintDialog() {
         AlertDialog.Builder builder = new AlertDialog.Builder(this);
         builder.setTitle("构建指纹库");
@@ -491,7 +597,7 @@ public class MapActivity extends AppCompatActivity {
             new Thread(() -> {
                 try {
                     // 修改数据
-                    String url = HttpConstant.DATA_URL + "/build" +"/"+ spaceId;
+                    String url = HttpConstant.DATA_URL + "/build" + "/" + spaceId;
                     RequestBody body = RequestBody.create(null, "");
 
                     Request request = new Request.Builder()
@@ -535,6 +641,16 @@ public class MapActivity extends AppCompatActivity {
 
     }
 
+    private void switchRpTrace(){
+        isOpenRpTrace = !isOpenRpTrace;
+
+        if(isOpenRpTrace){
+            ivMap.setRpTracePoints(rpTracePoints);
+        }else {
+            ivMap.clearRpTracePoints();
+        }
+    }
+
     private void uploadMapImage(Uri imageUri) {
         appendLog("开始上传地图...");
 
@@ -563,7 +679,7 @@ public class MapActivity extends AppCompatActivity {
                         .build();
 
                 Request request = new Request.Builder()
-                        .url(HttpConstant.SPACE_URL+"/upload")
+                        .url(HttpConstant.SPACE_URL + "/upload")
                         .post(requestBody)
                         .build();
 
@@ -679,6 +795,9 @@ public class MapActivity extends AppCompatActivity {
         }
         appendLog("采集已停止");
         updateUIForMode();
+        if(isOpenRpTrace){
+            loadRpTrace();
+        }
     }
 
     // 执行单次采集

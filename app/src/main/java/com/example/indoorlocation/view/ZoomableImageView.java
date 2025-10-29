@@ -11,6 +11,10 @@ import android.view.MotionEvent;
 
 import androidx.annotation.Nullable;
 
+import java.util.ArrayList;
+import java.util.List;
+import java.util.stream.Collectors;
+
 public class ZoomableImageView extends androidx.appcompat.widget.AppCompatImageView {
     private static final float MIN_SCALE_RATIO = 0.5f;
     private static final float MAX_SCALE_RATIO = 2f;
@@ -26,8 +30,10 @@ public class ZoomableImageView extends androidx.appcompat.widget.AppCompatImageV
 
     // 标记点相关
     private PointF markerPoint = null; // 标记点坐标（米）
-    private Paint curMarkerPaint; // 当前标记点画笔
-    private Paint hisMarkerPaint; // 历史标记点画笔
+
+    private List<PointF> historyMarkerPoints = new ArrayList<>();
+    private Paint redMarkerPaint; // 当前标记点画笔
+    private Paint greenMarkerPaint; // 历史标记点画笔
 
     private float initialScale = 1.0f; // 初始缩放比例（默认1.0，即原始尺寸）
     private Matrix matrix = new Matrix();
@@ -70,10 +76,15 @@ public class ZoomableImageView extends androidx.appcompat.widget.AppCompatImageV
         initCoordinatePaints();
 
         // 初始化标记点画笔
-        curMarkerPaint = new Paint();
-        curMarkerPaint.setColor(Color.RED);
-        curMarkerPaint.setStyle(Paint.Style.FILL);
-        curMarkerPaint.setAntiAlias(true);
+        redMarkerPaint = new Paint();
+        redMarkerPaint.setColor(Color.RED);
+        redMarkerPaint.setStyle(Paint.Style.FILL);
+        redMarkerPaint.setAntiAlias(true);
+
+        greenMarkerPaint = new Paint();
+        greenMarkerPaint.setColor(Color.GREEN);
+        greenMarkerPaint.setStyle(Paint.Style.FILL);
+        greenMarkerPaint.setAntiAlias(true);
     }
 
     private void initCoordinatePaints() {
@@ -106,7 +117,11 @@ public class ZoomableImageView extends androidx.appcompat.widget.AppCompatImageV
 
         // 绘制标记点
         if (markerPoint != null && getDrawable() != null) {
-            drawMarker(canvas);
+            drawMarker(canvas, markerPoint, redMarkerPaint);
+        }
+
+        if (historyMarkerPoints != null && getDrawable() != null) {
+            drawHistoryMarker(canvas);
         }
     }
 
@@ -164,7 +179,15 @@ public class ZoomableImageView extends androidx.appcompat.widget.AppCompatImageV
         }
     }
 
-    private void drawMarker(Canvas canvas) {
+    private void drawHistoryMarker(Canvas canvas) {
+        if (historyMarkerPoints == null || historyMarkerPoints.isEmpty()) {
+            return;
+        }
+
+        historyMarkerPoints.forEach(p -> drawMarker(canvas, p, greenMarkerPaint));
+    }
+
+    private void drawMarker(Canvas canvas, PointF point, Paint paint) {
         // 获取图片原始尺寸
         int drawableWidth = getDrawable().getIntrinsicWidth();
         int drawableHeight = getDrawable().getIntrinsicHeight();
@@ -186,11 +209,11 @@ public class ZoomableImageView extends androidx.appcompat.widget.AppCompatImageV
         float meterToPixelY = drawableHeight * scaleY / maxY;
 
         // 计算标记点在屏幕上的位置
-        float screenX = originX + markerPoint.x * meterToPixelX;
-        float screenY = originY - markerPoint.y * meterToPixelY;
+        float screenX = originX + point.x * meterToPixelX;
+        float screenY = originY - point.y * meterToPixelY;
 
         // 绘制红点标记
-        canvas.drawCircle(screenX, screenY, 10 * Math.max(scaleX, scaleY), curMarkerPaint);
+        canvas.drawCircle(screenX, screenY, 10 * Math.max(scaleX, scaleY), paint);
     }
 
     @Override
@@ -383,10 +406,27 @@ public class ZoomableImageView extends androidx.appcompat.widget.AppCompatImageV
         invalidate(); // 重绘
     }
 
+    // 绘制历史rp点
+    public void setRpTracePoints(List<PointF> points) {
+
+        historyMarkerPoints = points.stream()
+                .filter(point -> point.x >= 0 && point.x <= maxX && point.y >= 0 && point.y <= maxY)
+                .collect(Collectors.toList());
+
+        invalidate();
+    }
+
+    public void clearRpTracePoints() {
+
+        historyMarkerPoints.clear();
+
+        invalidate();
+    }
+
     // 标记点控制方法
     public void setMarkerPoint(float x, float y) {
         // 检查坐标是否在有效范围内
-        if (x >= 0 && x <= maxX && y >=0 && y <= maxY) {
+        if (x >= 0 && x <= maxX && y >= 0 && y <= maxY) {
             this.markerPoint = new PointF(x, y);
         } else {
             this.markerPoint = null;

@@ -35,30 +35,19 @@
             android:textColor="#333333"
             android:textStyle="bold" />
 
-<!--        <TextView-->
-<!--            android:id="@+id/tv_dimensions"-->
+<!--        <Button-->
+<!--            android:id="@+id/btn_build_coord"-->
 <!--            android:layout_width="wrap_content"-->
 <!--            android:layout_height="wrap_content"-->
-<!--            android:text="横宽比: X"-->
+<!--            android:text="重建坐标系"-->
+<!--            android:textColor="#ffffff"-->
+<!--            android:backgroundTint="#007AFF"-->
 <!--            android:textSize="14sp"-->
 <!--            app:layout_constraintStart_toEndOf="@id/tv_space_name"-->
 <!--            app:layout_constraintTop_toTopOf="parent"-->
 <!--            app:layout_constraintBottom_toBottomOf="@id/tv_space_name"-->
+<!--            app:layout_constraintEnd_toEndOf="parent"-->
 <!--            android:layout_marginStart="16dp" />-->
-
-        <Button
-            android:id="@+id/btn_build_coord"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="重建坐标系"
-            android:textColor="#ffffff"
-            android:backgroundTint="#007AFF"
-            android:textSize="14sp"
-            app:layout_constraintStart_toEndOf="@id/tv_space_name"
-            app:layout_constraintTop_toTopOf="parent"
-            app:layout_constraintBottom_toBottomOf="@id/tv_space_name"
-            app:layout_constraintEnd_toEndOf="parent"
-            android:layout_marginStart="16dp" />
 
         <!-- 复位按钮 -->
         <Button
@@ -69,7 +58,22 @@
             android:textColor="#ffffff"
             android:backgroundTint="#007AFF"
             android:textSize="14sp"
-            app:layout_constraintStart_toEndOf="@id/btn_build_coord"
+            app:layout_constraintStart_toEndOf="@id/tv_space_name"
+            app:layout_constraintTop_toTopOf="parent"
+            app:layout_constraintBottom_toBottomOf="@id/tv_space_name"
+            app:layout_constraintEnd_toEndOf="parent"
+            android:layout_marginStart="16dp" />
+
+        <!-- 重置数据按钮 -->
+        <Button
+            android:id="@+id/btn_reset_data"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/reset_data"
+            android:textColor="#ffffff"
+            android:backgroundTint="#007AFF"
+            android:textSize="14sp"
+            app:layout_constraintStart_toEndOf="@id/btn_reset"
             app:layout_constraintTop_toTopOf="parent"
             app:layout_constraintBottom_toBottomOf="@id/tv_space_name"
             app:layout_constraintEnd_toEndOf="parent"
@@ -93,7 +97,16 @@
             android:scaleType="matrix"
             android:visibility="gone"
             android:contentDescription="地图" />
-        <!-- 复位按钮 -->
+        <!-- rp点开关 -->
+        <Button
+            android:id="@+id/btn_rp_trace_switch"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:layout_gravity="bottom|left"
+            android:drawableStart="@drawable/rp_trace"
+            android:padding="8dp"
+            android:contentDescription="@string/rp_trace_switch"
+            android:backgroundTint="#FFFFFF" />
 <!--        <Button-->
 <!--            android:id="@+id/btn_reset"-->
 <!--            android:layout_width="wrap_content"-->
@@ -205,7 +218,7 @@
 
                 <EditText
                     android:id="@+id/et_x"
-                    android:layout_width="40dp"
+                    android:layout_width="60dp"
                     android:layout_height="40dp"
                     android:layout_marginStart="8dp"
                     android:hint="@string/coordinate_default"
@@ -233,7 +246,7 @@
 
                 <EditText
                     android:id="@+id/et_y"
-                    android:layout_width="40dp"
+                    android:layout_width="60dp"
                     android:layout_height="40dp"
                     android:layout_marginStart="8dp"
                     android:hint="@string/coordinate_default"
@@ -264,26 +277,17 @@
 
                 <Spinner
                     android:id="@+id/spinner_sample_count"
-                    android:layout_width="40dp"
+                    android:layout_width="60dp"
                     android:layout_height="40dp"
                     android:layout_marginStart="8dp"
-                    android:background="@android:drawable/spinner_background" />
+                    android:background="@drawable/spinner_no_border"
+                    android:minWidth="20dp" />
 
             </LinearLayout>
-            <!-- 新增：构建指纹库按钮 -->
-            <Button
-                android:id="@+id/btn_build_fingerprint"
-                android:layout_width="wrap_content"
-                android:layout_height="40dp"
-                android:layout_marginStart="16dp"
-                android:text="@string/build_fingerprint"
-                android:textColor="#ffffff"
-                android:backgroundTint="#007AFF"
-                android:textSize="14sp" />
 
         </LinearLayout>
 
-        <!-- 构建指纹库按钮 -->
+
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -305,6 +309,18 @@
                 android:textColor="#ffffff"
                 android:backgroundTint="#007AFF"
                 android:paddingHorizontal="32dp" />
+
+            <Button
+                android:id="@+id/btn_build_fingerprint"
+                android:layout_width="40dp"
+                android:layout_height="wrap_content"
+                android:drawableStart="@drawable/baseline_data_usage"
+                android:padding="8dp"
+                android:contentDescription="@string/build_fingerprint"
+                android:textColor="#ffffff"
+                android:backgroundTint="#FFFFFF"
+                app:layout_constraintEnd_toEndOf="parent"
+                android:layout_marginStart="16dp" />
 
         </LinearLayout>
 
