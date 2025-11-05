@@ -8,5 +8,7 @@ public class ApDto {
     private String apName;
     private Integer rssi;
     private Integer rsrp;
+    private Integer rsrq;
+    private Integer sinr;
     private String source;
 }

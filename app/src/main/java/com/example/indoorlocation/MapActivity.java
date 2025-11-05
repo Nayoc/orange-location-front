@@ -18,6 +18,8 @@ import android.telephony.CellIdentityNr;
 import android.telephony.CellInfo;
 import android.telephony.CellInfoLte;
 import android.telephony.CellInfoNr;
+import android.telephony.CellSignalStrength;
+import android.telephony.CellSignalStrengthNr;
 import android.telephony.TelephonyManager;
 import android.text.Editable;
 import android.text.TextUtils;
@@ -902,16 +904,27 @@ public class MapActivity extends AppCompatActivity {
                         ApDto apDto = new ApDto();
                         if (cellInfo instanceof CellInfoLte) {
                             CellInfoLte lte = (CellInfoLte) cellInfo;
-                            int rsrp = lte.getCellSignalStrength().getDbm();
+                            int rsrp = lte.getCellSignalStrength().getRsrp();
+                            int dbm = lte.getCellSignalStrength().getDbm();
+                            int rsrq = lte.getCellSignalStrength().getRsrq();
+                            int sinr = lte.getCellSignalStrength().getRssnr();
+
                             // 使用物理小区id，也可以用全局id
                             apDto.setApId(String.valueOf(lte.getCellIdentity().getPci()));
                             apDto.setRsrp(rsrp);
+                            apDto.setRsrq(rsrq);
+                            apDto.setSinr(sinr);
 
                         } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && cellInfo instanceof CellInfoNr) {
                             CellInfoNr nr = (CellInfoNr) cellInfo;
-                            int rsrp = nr.getCellSignalStrength().getDbm();
+                            CellSignalStrengthNr signal = (CellSignalStrengthNr)nr.getCellSignalStrength();
+                            int rsrp = signal.getSsRsrp();
+                            int rsrq = signal.getSsRsrq();
+                            int sinr = signal.getSsSinr();
                             apDto.setApId(String.valueOf(((CellIdentityNr) nr.getCellIdentity()).getPci()));
                             apDto.setRsrp(rsrp);
+                            apDto.setRsrq(rsrq);
+                            apDto.setSinr(sinr);
                         }
                         apDto.setSource(SingleSourceTypeEnum.CELL.getValue());
 
