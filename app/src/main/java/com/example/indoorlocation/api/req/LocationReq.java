@@ -1,7 +1,6 @@
 package com.example.indoorlocation.api.req;
 
 import com.example.indoorlocation.model.ApDto;
-
 import lombok.Data;
 
 import java.util.Date;
@@ -12,14 +11,11 @@ import java.util.List;
  * @date 2025/8/25 16:11
  */
 @Data
-public class CollectionReq {
+public class LocationReq {
     private Integer spaceId;
-    private String collectionBatchId;
-    private String requestBatchId;
-
+    private String navigationBatchId;
 
     private List<ApDto> apList;
-    private double rpX;
-    private double rpY;
+
     private String createTime;
 }

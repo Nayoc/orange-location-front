@@ -2,8 +2,8 @@ package com.example.indoorlocation;
 
 import static com.example.indoorlocation.SpaceManagementActivity.JSON;
 
-import android.app.Activity;
 import android.Manifest;
+import android.app.Activity;
 import android.app.AlertDialog;
 import android.content.Context;
 import android.content.Intent;
@@ -18,7 +18,7 @@ import android.telephony.CellIdentityNr;
 import android.telephony.CellInfo;
 import android.telephony.CellInfoLte;
 import android.telephony.CellInfoNr;
-import android.telephony.CellSignalStrength;
+import android.telephony.CellSignalStrengthLte;
 import android.telephony.CellSignalStrengthNr;
 import android.telephony.TelephonyManager;
 import android.text.Editable;
@@ -43,7 +43,11 @@ import androidx.core.app.ActivityCompat;
 
 import com.bumptech.glide.Glide;
 import com.bumptech.glide.request.RequestOptions;
+import com.example.indoorlocation.api.CommonCallback;
 import com.example.indoorlocation.api.req.CollectionReq;
+import com.example.indoorlocation.api.req.LocationReq;
+import com.example.indoorlocation.api.req.NavigationReq;
+import com.example.indoorlocation.api.vo.Point;
 import com.example.indoorlocation.constant.HttpConstant;
 import com.example.indoorlocation.constant.SingleSourceTypeEnum;
 import com.example.indoorlocation.model.ApDto;
@@ -59,10 +63,14 @@ import java.io.File;
 import java.lang.reflect.Type;
 import java.text.SimpleDateFormat;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.Date;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -83,7 +91,7 @@ public class MapActivity extends AppCompatActivity {
     private LinearLayout layoutUpload;
     private ZoomableImageView ivMap;
     private Button btnReset;
-//    private TextView btnBuildCoord;
+    //    private TextView btnBuildCoord;
     private Button btnUploadMap;
     private TextView tvLog;
     private ScrollView scrollViewLog;
@@ -116,9 +124,12 @@ public class MapActivity extends AppCompatActivity {
     private SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy.MM.dd HH:mm:ss", Locale.CHINA);
 
     // 采集次数选项
-    private final String[] sampleCounts = {"1次", "5次", "10次", "30次"};
-    private final int[] sampleCountValues = {1, 5, 10, 30};
+    private static final Integer MIN_RSSI = -90;
+    private final String[] sampleCounts = {"1次", "10次", "100次", "500次"};
+    private final int[] sampleCountValues = {1, 10, 100, 500};
     private int selectedSampleCount = 1;
+
+    private AtomicInteger collectionFailCount = new AtomicInteger(0);
 
     // 模式选项
     private final String[] modes = {"采集", "定位"};
@@ -126,6 +137,8 @@ public class MapActivity extends AppCompatActivity {
 
     // 采集批次号
     private String collectionBatchId = "";
+    // 导航批次号
+    private String navigationBatchId = "";
     // 定位批次号
     private String locationBatchId = "";
 
@@ -214,6 +227,10 @@ public class MapActivity extends AppCompatActivity {
 
         // 地图点击事件
         ivMap.setOnMapClickListener((x, y) -> {
+            if(!currentMode.equals("采集")){
+                return;
+            }
+
             // 保留两位小数
             x = (float) (Math.round(x * 100) / 100.0);
             y = (float) (Math.round(y * 100) / 100.0);
@@ -293,9 +310,9 @@ public class MapActivity extends AppCompatActivity {
         // 开始按钮
         btnStart.setOnClickListener(v -> toggleOperation());
 
-        btnRpTraceSwitch.setOnClickListener(v-> switchRpTrace());
+        btnRpTraceSwitch.setOnClickListener(v -> switchRpTrace());
 
-        btnResetData.setOnClickListener(v-> showResetDataDialog());
+        btnResetData.setOnClickListener(v -> showResetDataDialog());
     }
 
     private void showResetDataDialog() {
@@ -374,7 +391,7 @@ public class MapActivity extends AppCompatActivity {
             layoutSampleCount.setVisibility(View.VISIBLE);
             btnBuildFingerprint.setVisibility(View.VISIBLE);
             btnStart.setText(isCollecting ? "停止采集" : "开始采集");
-
+            ivMap.clearMarker();
             // 设置按钮颜色
             if (isCollecting) {
                 btnStart.setBackgroundTintList(getResources().getColorStateList(android.R.color.holo_red_dark));
@@ -387,6 +404,8 @@ public class MapActivity extends AppCompatActivity {
             btnBuildFingerprint.setVisibility(View.GONE);
             btnStart.setText(isPositioning ? "停止定位" : "开始定位");
             btnStart.setBackgroundTintList(getResources().getColorStateList(R.color.blue));
+            ivMap.clearMarker();
+            ivMap.clearRpTracePoints();
         }
     }
 
@@ -561,7 +580,8 @@ public class MapActivity extends AppCompatActivity {
                 Response response = client.newCall(request).execute();
                 if (response.isSuccessful()) {
                     String responseData = response.body().string();
-                    Type listType = new TypeToken<List<PointF>>(){}.getType();
+                    Type listType = new TypeToken<List<PointF>>() {
+                    }.getType();
                     rpTracePoints = gson.fromJson(responseData, listType);
 
                     runOnUiThread(() -> {
@@ -573,7 +593,7 @@ public class MapActivity extends AppCompatActivity {
                     });
                 }
 
-            }catch (Exception e) {
+            } catch (Exception e) {
                 runOnUiThread(() -> {
                     appendLog("历史rp点绘制失败");
                 });
@@ -643,12 +663,12 @@ public class MapActivity extends AppCompatActivity {
 
     }
 
-    private void switchRpTrace(){
+    private void switchRpTrace() {
         isOpenRpTrace = !isOpenRpTrace;
 
-        if(isOpenRpTrace){
+        if (isOpenRpTrace) {
             ivMap.setRpTracePoints(rpTracePoints);
-        }else {
+        } else {
             ivMap.clearRpTracePoints();
         }
     }
@@ -762,33 +782,197 @@ public class MapActivity extends AppCompatActivity {
     }
 
     private void startCollectRunnable() {
-        collectRunnable = new Runnable() {
-            @Override
-            public void run() {
-                if (!isCollecting) return;
+        isCollecting = true;
+        collectionFailCount.set(0);
+        currentCollectCount = 0;
 
-                // 执行采集
-                performCollect();
+        new Thread(() -> {
+            OkHttpClient client = new OkHttpClient.Builder()
+                    .connectTimeout(10, TimeUnit.SECONDS)
+                    .build();
+
+            while (isCollecting && currentCollectCount < selectedSampleCount) {
+                boolean success = performCollectSync(client);
+
+                if (!success) {
+                    collectionFailCount.incrementAndGet();
+                }
 
                 currentCollectCount++;
 
-                // 检查是否达到采集次数
-                if (currentCollectCount >= selectedSampleCount) {
-                    runOnUiThread(() -> {
-                        appendLog("已完成全部" + selectedSampleCount + "次采集");
-                        stopCollecting();
-                    });
-                    return;
+                int count = currentCollectCount;
+                int total = selectedSampleCount;
+
+                runOnUiThread(() -> updateLastLineLog(
+                        String.format("当前已采集 %d/%d 次", count, total), 5));
+
+                try {
+                    Thread.sleep(200); // 间隔200ms
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    break;
                 }
-
-                // 继续下一次采集
-                handler.postDelayed(this, 1000);
             }
-        };
 
-        // 立即执行第一次采集
-        handler.post(collectRunnable);
+            // 补采逻辑
+            if (collectionFailCount.get() > 0 && isCollecting) {
+                int failCount = collectionFailCount.getAndSet(0);
+                runOnUiThread(() -> appendLog("采集异常 " + failCount + " 次，继续补充采集"));
+                selectedSampleCount += failCount; // 补足次数
+                startCollectRunnable(); // 递归启动补采
+                return;
+            }
+
+            runOnUiThread(() -> {
+                appendLog("已完成全部 " + selectedSampleCount + " 次采集");
+                stopCollecting();
+            });
+        }).start();
     }
+
+    private boolean performCollectSync(OkHttpClient client) {
+        String xStr = etX.getText().toString().trim();
+        String yStr = etY.getText().toString().trim();
+
+
+        try {
+            double x = Double.parseDouble(xStr);
+            double y = Double.parseDouble(yStr);
+
+            SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.CHINA);
+            String time = sdf.format(new Date());
+
+            List<ApDto> wifiList = getWifiList();
+            List<ApDto> cellList = getCellList();
+            List<ApDto> apList = Stream.concat(wifiList.stream(), cellList.stream()).collect(Collectors.toList());
+
+            String requestBatchId = String.valueOf(System.currentTimeMillis());
+
+            CollectionReq req = new CollectionReq();
+            req.setApList(apList);
+            req.setRequestBatchId(requestBatchId);
+            req.setCollectionBatchId(collectionBatchId);
+            req.setSpaceId(Integer.parseInt(spaceId));
+            req.setCreateTime(time);
+            req.setRpX(x);
+            req.setRpY(y);
+
+            String json = gson.toJson(req);
+            RequestBody body = RequestBody.create(json, JSON);
+
+            Request request = new Request.Builder()
+                    .url(HttpConstant.COLLECTION_URL)
+                    .post(body)
+                    .build();
+
+            Response response = client.newCall(request).execute();
+            return response.isSuccessful();
+
+        } catch (Exception e) {
+            e.printStackTrace();
+            return false;
+        }
+    }
+
+
+//    private void startCollectRunnable() {
+//        collectRunnable = new Runnable() {
+//            @Override
+//            public void run() {
+//                if (!isCollecting) return;
+//
+//                // 执行采集
+//                performCollect();
+//
+//                currentCollectCount++;
+//
+//                // 记录采集次数
+//                runOnUiThread(() -> {
+//                    updateLastLineLog(String.format("当前已采集" + currentCollectCount + "/" + selectedSampleCount + "次"), 5);
+//                });
+//
+//                // 检查是否达到采集次数
+//                if (currentCollectCount >= selectedSampleCount) {
+//                    if (collectionFailCount.get() > 0) {
+//                        runOnUiThread(() -> {
+//                            appendLog("采集异常" + collectionFailCount + "次，继续补充采集");
+//                        });
+//                        currentCollectCount = selectedSampleCount - collectionFailCount.get() + 1;
+//                        collectionFailCount.set(0);
+//                    } else {
+//                        runOnUiThread(() -> {
+//                            appendLog("已完成全部" + selectedSampleCount + "次采集");
+//                            stopCollecting();
+//                        });
+//                        return;
+//                    }
+//                }
+//
+//                // 继续下一次采集
+//                handler.postDelayed(this, 200);
+//            }
+//        };
+//
+//        // 立即执行第一次采集
+//        handler.post(collectRunnable);
+//    }
+//
+//
+//    // 执行单次采集
+//    private void performCollect() {
+//        String xStr = etX.getText().toString().trim();
+//        String yStr = etY.getText().toString().trim();
+//
+//        try {
+//            double x = Double.parseDouble(xStr);
+//            double y = Double.parseDouble(yStr);
+//
+//            // 获取当前时间
+//            SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.CHINA);
+//            String time = sdf.format(new Date());
+//
+//            new Thread(() -> {
+//                try {
+//                    OkHttpClient client = new OkHttpClient.Builder()
+//                            .connectTimeout(30, TimeUnit.SECONDS)
+//                            .build();
+//
+//                    // 获取WiFi列表和5G RSRP值（这里需要根据实际设备API实现）
+//                    List<ApDto> wifiList = getWifiList();
+//                    List<ApDto> cellList = getCellList();
+//
+//                    List<ApDto> apList = Stream.concat(wifiList.stream(), cellList.stream()).collect(Collectors.toList());
+//
+//                    CollectionReq req = new CollectionReq();
+//                    req.setApList(apList);
+//                    req.setCollectionBatchId(collectionBatchId);
+//                    req.setSpaceId(Integer.valueOf(spaceId));
+//                    req.setCreatedTime(time);
+//                    req.setRpX(Double.parseDouble(etX.getText().toString()));
+//                    req.setRpY(Double.parseDouble(etY.getText().toString()));
+//
+//                    // 构建请求体
+//                    String json = gson.toJson(req);
+//                    RequestBody body = RequestBody.create(json, JSON);
+//
+//                    Request request = new Request.Builder()
+//                            .url(HttpConstant.COLLECTION_URL)
+//                            .post(body)
+//                            .build();
+//
+//                    Response response = client.newCall(request).execute();
+//                    if (!response.isSuccessful()) {
+//                        collectionFailCount.getAndAdd(1);
+//                    }
+//                } catch (Exception e) {
+//                    collectionFailCount.getAndAdd(1);
+//                }
+//            }).start();
+//
+//        } catch (NumberFormatException e) {
+//            appendLog("坐标格式错误");
+//        }
+//    }
 
     private void stopCollecting() {
         isCollecting = false;
@@ -797,75 +981,11 @@ public class MapActivity extends AppCompatActivity {
         }
         appendLog("采集已停止");
         updateUIForMode();
-        if(isOpenRpTrace){
+        if (isOpenRpTrace) {
             loadRpTrace();
         }
     }
 
-    // 执行单次采集
-    private void performCollect() {
-        String xStr = etX.getText().toString().trim();
-        String yStr = etY.getText().toString().trim();
-
-        try {
-            double x = Double.parseDouble(xStr);
-            double y = Double.parseDouble(yStr);
-
-            // 获取当前时间
-            SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.CHINA);
-            String time = sdf.format(new Date());
-
-            // 输出日志
-            runOnUiThread(() -> {
-                appendLog(String.format("信号采集——坐标:[%.2f,%.2f]，时间:%s", x, y, time));
-            });
-
-            new Thread(() -> {
-                try {
-                    OkHttpClient client = new OkHttpClient.Builder()
-                            .connectTimeout(30, TimeUnit.SECONDS)
-                            .build();
-
-                    // 获取WiFi列表和5G RSRP值（这里需要根据实际设备API实现）
-                    List<ApDto> wifiList = getWifiList();
-                    List<ApDto> cellList = getCellList();
-
-                    List<ApDto> apList = Stream.concat(wifiList.stream(), cellList.stream()).collect(Collectors.toList());
-
-                    CollectionReq req = new CollectionReq();
-                    req.setApList(apList);
-                    req.setCollectionBatchId(collectionBatchId);
-                    req.setSpaceId(Integer.valueOf(spaceId));
-                    req.setCreatedTime(time);
-                    req.setRpX(Double.parseDouble(etX.getText().toString()));
-                    req.setRpY(Double.parseDouble(etY.getText().toString()));
-
-                    // 构建请求体
-                    String json = gson.toJson(req);
-                    RequestBody body = RequestBody.create(json, JSON);
-
-                    Request request = new Request.Builder()
-                            .url(HttpConstant.COLLECTION_URL)
-                            .post(body)
-                            .build();
-
-                    Response response = client.newCall(request).execute();
-                    if (!response.isSuccessful()) {
-                        runOnUiThread(() -> {
-                            appendLog("第" + currentCollectCount + "次采集失败: " + response.code());
-                        });
-                    }
-                } catch (Exception e) {
-                    runOnUiThread(() -> {
-                        appendLog("采集错误: " + e.getMessage());
-                    });
-                }
-            }).start();
-
-        } catch (NumberFormatException e) {
-            appendLog("坐标格式错误");
-        }
-    }
 
     // 获取WiFi列表（需要实现实际逻辑）
     private List<ApDto> getWifiList() {
@@ -875,15 +995,22 @@ public class MapActivity extends AppCompatActivity {
             if (ActivityCompat.checkSelfPermission(this, android.Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
                 List<ApDto> results = wifiManager.getScanResults()
                         .stream()
+                        .filter(ap -> ap.level > MIN_RSSI)
                         .map(scanResult -> {
                             ApDto ap = new ApDto();
+
                             ap.setApId(scanResult.BSSID);
                             ap.setApName(scanResult.SSID);
                             ap.setRssi(scanResult.level);
                             ap.setSource(SingleSourceTypeEnum.WIFI.getValue());
 
                             return ap;
-                        }).collect(Collectors.toList());
+                        })
+                        // 过滤保留信号最好的前20个
+                        .sorted(Comparator.comparing(ApDto::getRssi).reversed())
+                        .limit(20)
+                        .collect(Collectors.toList());
+
 
                 return results;
             }
@@ -900,38 +1027,44 @@ public class MapActivity extends AppCompatActivity {
             if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
                 List<CellInfo> cellInfos = telephonyManager.getAllCellInfo();
                 if (cellInfos != null && !cellInfos.isEmpty()) {
-                    List<ApDto> results = cellInfos.stream().map(cellInfo -> {
-                        ApDto apDto = new ApDto();
-                        if (cellInfo instanceof CellInfoLte) {
-                            CellInfoLte lte = (CellInfoLte) cellInfo;
-                            int rsrp = lte.getCellSignalStrength().getRsrp();
-                            int dbm = lte.getCellSignalStrength().getDbm();
-                            int rsrq = lte.getCellSignalStrength().getRsrq();
-                            int sinr = lte.getCellSignalStrength().getRssnr();
+                    List<ApDto> results = cellInfos.stream()
+                            .map(cellInfo -> {
+                                ApDto apDto = new ApDto();
+                                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                                    if (cellInfo instanceof CellInfoLte) {
+                                        CellInfoLte lte = (CellInfoLte) cellInfo;
+                                        CellSignalStrengthLte signal = (CellSignalStrengthLte) lte.getCellSignalStrength();
+                                        int rsrp = signal.getRsrp();
+                                        int rsrq = lte.getCellSignalStrength().getRsrq();
+                                        int sinr = signal.getRssnr();
 
-                            // 使用物理小区id，也可以用全局id
-                            apDto.setApId(String.valueOf(lte.getCellIdentity().getPci()));
-                            apDto.setRsrp(rsrp);
-                            apDto.setRsrq(rsrq);
-                            apDto.setSinr(sinr);
+                                        // 使用物理小区id，也可以用全局id
+                                        apDto.setApId(String.valueOf(lte.getCellIdentity().getPci()));
+                                        apDto.setRsrp(rsrp);
+                                        apDto.setRsrq(rsrq);
+                                        apDto.setSinr(sinr > -20 && sinr < 30 ? sinr : -20);
+                                    } else if (cellInfo instanceof CellInfoNr) {
+                                        CellInfoNr nr = (CellInfoNr) cellInfo;
+                                        CellSignalStrengthNr signal = (CellSignalStrengthNr) nr.getCellSignalStrength();
+                                        int rsrp = signal.getSsRsrp();
+                                        int rsrq = signal.getSsRsrq();
+                                        int sinr = signal.getSsSinr();
+                                        apDto.setApId(String.valueOf(((CellIdentityNr) nr.getCellIdentity()).getPci()));
+                                        apDto.setRsrp(rsrp);
+                                        apDto.setRsrq(rsrq);
+                                        apDto.setSinr(sinr);
+                                    }
+                                    apDto.setSource(SingleSourceTypeEnum.CELL.getValue());
+                                }
+                                return apDto;
+                            })
+                            .filter(apDto -> apDto.getRsrp() != null)
+                            .collect(Collectors.toList());
 
-                        } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && cellInfo instanceof CellInfoNr) {
-                            CellInfoNr nr = (CellInfoNr) cellInfo;
-                            CellSignalStrengthNr signal = (CellSignalStrengthNr)nr.getCellSignalStrength();
-                            int rsrp = signal.getSsRsrp();
-                            int rsrq = signal.getSsRsrq();
-                            int sinr = signal.getSsSinr();
-                            apDto.setApId(String.valueOf(((CellIdentityNr) nr.getCellIdentity()).getPci()));
-                            apDto.setRsrp(rsrp);
-                            apDto.setRsrq(rsrq);
-                            apDto.setSinr(sinr);
-                        }
-                        apDto.setSource(SingleSourceTypeEnum.CELL.getValue());
-
-                        return apDto;
-                    }).collect(Collectors.toList());
-
-                    return results;
+                    Set<String> seenFields = new LinkedHashSet<>();
+                    return results.stream()
+                            .filter(item -> seenFields.add(item.getApId()))
+                            .collect(Collectors.toList());
                 }
             }
         }
@@ -942,9 +1075,21 @@ public class MapActivity extends AppCompatActivity {
     private void togglePosition() {
         isPositioning = !isPositioning;
         if (isPositioning) {
-            appendLog("开始定位...");
             btnStart.setText("停止定位");
-            startPositioning();
+            startNavigation(new CommonCallback() {
+                @Override
+                public void onSuccess() {
+                    startPositioning();
+                }
+
+                @Override
+                public void onFailure() {
+                    appendLog("定位已停止");
+                    btnStart.setText("开始定位");
+                }
+            });
+
+
         } else {
             appendLog("定位已停止");
             btnStart.setText("开始定位");
@@ -968,8 +1113,56 @@ public class MapActivity extends AppCompatActivity {
 
     private void stopPositioning() {
         if (positioningRunnable != null) {
+            ivMap.clearMarker();
             handler.removeCallbacks(positioningRunnable);
         }
+    }
+
+    private void startNavigation(CommonCallback callback) {
+        new Thread(() -> {
+            try {
+                OkHttpClient client = new OkHttpClient.Builder()
+                        .connectTimeout(10, TimeUnit.SECONDS)
+                        .build();
+
+                navigationBatchId = String.valueOf(System.currentTimeMillis());
+                SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.CHINA);
+                String time = sdf.format(new Date());
+
+                NavigationReq req = new NavigationReq();
+                req.setSpaceId(Integer.parseInt(spaceId));
+                req.setCreateTime(time);
+                req.setNavigationBatchId(navigationBatchId);
+
+                String json = gson.toJson(req);
+
+                RequestBody body = RequestBody.create(json, JSON);
+
+                // 调用导航接口
+                Request request = new Request.Builder()
+                        .url(HttpConstant.LOCATION_URL + "/start")
+                        .post(body)
+                        .build();
+
+                Response response = client.newCall(request).execute();
+                if (response.isSuccessful()) {
+                    runOnUiThread(() -> {
+                        appendLog("定位已开启，批次号:" + navigationBatchId);
+                        callback.onSuccess();
+                    });
+                } else {
+                    runOnUiThread(() -> {
+                        appendLog("定位开启失败");
+                        callback.onFailure();
+                    });
+                }
+            } catch (Exception e) {
+                runOnUiThread(() -> {
+                    appendLog("定位开启失败");
+                    callback.onFailure();
+                });
+            }
+        }).start();
     }
 
     private void requestLocation() {
@@ -979,22 +1172,44 @@ public class MapActivity extends AppCompatActivity {
                         .connectTimeout(10, TimeUnit.SECONDS)
                         .build();
 
+                List<ApDto> wifiList = getWifiList();
+                List<ApDto> cellList = getCellList();
+                List<ApDto> apList = Stream.concat(wifiList.stream(), cellList.stream()).collect(Collectors.toList());
+
+                SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.CHINA);
+                String time = sdf.format(new Date());
+
+                LocationReq req = new LocationReq();
+                req.setSpaceId(Integer.parseInt(spaceId));
+                req.setCreateTime(time);
+                req.setNavigationBatchId(navigationBatchId);
+                req.setApList(apList);
+
+                String json = gson.toJson(req);
+                RequestBody body = RequestBody.create(json, JSON);
+
                 // 调用定位接口
                 Request request = new Request.Builder()
-                        .url("http://your-api-url.com/api/spaces/" + spaceId + "/location")
+                        .url(HttpConstant.LOCATION_URL)
+                        .post(body)
                         .build();
 
                 Response response = client.newCall(request).execute();
                 if (response.isSuccessful()) {
                     String responseData = response.body().string();
-                    JSONObject jsonObject = new JSONObject(responseData);
-                    double x = jsonObject.optDouble("x", 0);
-                    double y = jsonObject.optDouble("y", 0);
+
+                    Point point = gson.fromJson(responseData, new TypeToken<Point>() {
+                    }.getType());
+
+                    float x = point.getX();
+                    float y = point.getY();
+
+                    ivMap.setMarkerPoint(x,y);
 
                     runOnUiThread(() -> {
                         etX.setText(String.valueOf(x));
                         etY.setText(String.valueOf(y));
-                        appendLog("定位成功: (" + x + ", " + y + ")");
+                        appendLog("当前位置: (" + x + ", " + y + ")");
                     });
                 } else {
                     runOnUiThread(() -> {
@@ -1019,6 +1234,35 @@ public class MapActivity extends AppCompatActivity {
             scrollViewLog.post(() -> {
                 scrollViewLog.fullScroll(View.FOCUS_DOWN);
             });
+        });
+    }
+
+    private void updateLastLineLog(String message, Integer suffix) {
+        runOnUiThread(() -> {
+            String currentText = tvLog.getText().toString().trim();
+
+            // 情况1：当前日志为空 → 直接设置新消息（相当于第一行）
+            if (currentText.isEmpty()) {
+                tvLog.setText(message);
+                return;
+            }
+
+            String[] logLines = currentText.split("\n");
+
+            String originSuffix = logLines[logLines.length - 1].substring(0, suffix);
+            String newSuffix = message.substring(0, suffix);
+
+            // 只有指定数量前缀一样时才更新，否则新加
+            if (originSuffix.equals(newSuffix)) {
+                // 替换最后一行（数组最后一个元素）
+                logLines[logLines.length - 1] = message;
+
+                // 重新拼接所有行（恢复换行格式）
+                String newText = String.join("\n", logLines);
+                tvLog.setText(newText);
+            } else {
+                appendLog(message);
+            }
         });
     }
 
