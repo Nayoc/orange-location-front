@@ -11,4 +11,5 @@ public class ApDto {
     private Integer rsrq;
     private Integer sinr;
     private String source;
+    private String cellType;
 }

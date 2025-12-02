@@ -807,7 +807,7 @@ public class MapActivity extends AppCompatActivity {
                         String.format("当前已采集 %d/%d 次", count, total), 5));
 
                 try {
-                    Thread.sleep(200); // 间隔200ms
+                    Thread.sleep(5000); // 间隔5s
                 } catch (InterruptedException e) {
                     Thread.currentThread().interrupt();
                     break;
@@ -818,7 +818,7 @@ public class MapActivity extends AppCompatActivity {
             if (collectionFailCount.get() > 0 && isCollecting) {
                 int failCount = collectionFailCount.getAndSet(0);
                 runOnUiThread(() -> appendLog("采集异常 " + failCount + " 次，继续补充采集"));
-                selectedSampleCount += failCount; // 补足次数
+                selectedSampleCount = failCount; // 补足次数
                 startCollectRunnable(); // 递归启动补采
                 return;
             }
@@ -875,105 +875,6 @@ public class MapActivity extends AppCompatActivity {
     }
 
 
-//    private void startCollectRunnable() {
-//        collectRunnable = new Runnable() {
-//            @Override
-//            public void run() {
-//                if (!isCollecting) return;
-//
-//                // 执行采集
-//                performCollect();
-//
-//                currentCollectCount++;
-//
-//                // 记录采集次数
-//                runOnUiThread(() -> {
-//                    updateLastLineLog(String.format("当前已采集" + currentCollectCount + "/" + selectedSampleCount + "次"), 5);
-//                });
-//
-//                // 检查是否达到采集次数
-//                if (currentCollectCount >= selectedSampleCount) {
-//                    if (collectionFailCount.get() > 0) {
-//                        runOnUiThread(() -> {
-//                            appendLog("采集异常" + collectionFailCount + "次，继续补充采集");
-//                        });
-//                        currentCollectCount = selectedSampleCount - collectionFailCount.get() + 1;
-//                        collectionFailCount.set(0);
-//                    } else {
-//                        runOnUiThread(() -> {
-//                            appendLog("已完成全部" + selectedSampleCount + "次采集");
-//                            stopCollecting();
-//                        });
-//                        return;
-//                    }
-//                }
-//
-//                // 继续下一次采集
-//                handler.postDelayed(this, 200);
-//            }
-//        };
-//
-//        // 立即执行第一次采集
-//        handler.post(collectRunnable);
-//    }
-//
-//
-//    // 执行单次采集
-//    private void performCollect() {
-//        String xStr = etX.getText().toString().trim();
-//        String yStr = etY.getText().toString().trim();
-//
-//        try {
-//            double x = Double.parseDouble(xStr);
-//            double y = Double.parseDouble(yStr);
-//
-//            // 获取当前时间
-//            SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.CHINA);
-//            String time = sdf.format(new Date());
-//
-//            new Thread(() -> {
-//                try {
-//                    OkHttpClient client = new OkHttpClient.Builder()
-//                            .connectTimeout(30, TimeUnit.SECONDS)
-//                            .build();
-//
-//                    // 获取WiFi列表和5G RSRP值（这里需要根据实际设备API实现）
-//                    List<ApDto> wifiList = getWifiList();
-//                    List<ApDto> cellList = getCellList();
-//
-//                    List<ApDto> apList = Stream.concat(wifiList.stream(), cellList.stream()).collect(Collectors.toList());
-//
-//                    CollectionReq req = new CollectionReq();
-//                    req.setApList(apList);
-//                    req.setCollectionBatchId(collectionBatchId);
-//                    req.setSpaceId(Integer.valueOf(spaceId));
-//                    req.setCreatedTime(time);
-//                    req.setRpX(Double.parseDouble(etX.getText().toString()));
-//                    req.setRpY(Double.parseDouble(etY.getText().toString()));
-//
-//                    // 构建请求体
-//                    String json = gson.toJson(req);
-//                    RequestBody body = RequestBody.create(json, JSON);
-//
-//                    Request request = new Request.Builder()
-//                            .url(HttpConstant.COLLECTION_URL)
-//                            .post(body)
-//                            .build();
-//
-//                    Response response = client.newCall(request).execute();
-//                    if (!response.isSuccessful()) {
-//                        collectionFailCount.getAndAdd(1);
-//                    }
-//                } catch (Exception e) {
-//                    collectionFailCount.getAndAdd(1);
-//                }
-//            }).start();
-//
-//        } catch (NumberFormatException e) {
-//            appendLog("坐标格式错误");
-//        }
-//    }
-
     private void stopCollecting() {
         isCollecting = false;
         if (collectRunnable != null) {
@@ -992,11 +893,12 @@ public class MapActivity extends AppCompatActivity {
         // ========== Wi-Fi ==========
         WifiManager wifiManager = (WifiManager) getApplicationContext().getSystemService(Context.WIFI_SERVICE);
         if (wifiManager != null) {
+            wifiManager.startScan();
             if (ActivityCompat.checkSelfPermission(this, android.Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
                 List<ApDto> results = wifiManager.getScanResults()
                         .stream()
-                        .filter(ap -> ap.level > MIN_RSSI)
                         .map(scanResult -> {
+
                             ApDto ap = new ApDto();
 
                             ap.setApId(scanResult.BSSID);
@@ -1016,7 +918,6 @@ public class MapActivity extends AppCompatActivity {
             }
 
         }
-        appendLog("无wifi权限!");
         return Collections.emptyList();
     }
 
@@ -1039,20 +940,22 @@ public class MapActivity extends AppCompatActivity {
                                         int sinr = signal.getRssnr();
 
                                         // 使用物理小区id，也可以用全局id
-                                        apDto.setApId(String.valueOf(lte.getCellIdentity().getPci()));
+                                        apDto.setApId(String.valueOf(lte.getCellIdentity().getCi()));
                                         apDto.setRsrp(rsrp);
                                         apDto.setRsrq(rsrq);
                                         apDto.setSinr(sinr > -20 && sinr < 30 ? sinr : -20);
+                                        apDto.setCellType("lte");
                                     } else if (cellInfo instanceof CellInfoNr) {
                                         CellInfoNr nr = (CellInfoNr) cellInfo;
                                         CellSignalStrengthNr signal = (CellSignalStrengthNr) nr.getCellSignalStrength();
                                         int rsrp = signal.getSsRsrp();
                                         int rsrq = signal.getSsRsrq();
                                         int sinr = signal.getSsSinr();
-                                        apDto.setApId(String.valueOf(((CellIdentityNr) nr.getCellIdentity()).getPci()));
+                                        apDto.setApId(String.valueOf(((CellIdentityNr) nr.getCellIdentity()).getNci()));
                                         apDto.setRsrp(rsrp);
                                         apDto.setRsrq(rsrq);
                                         apDto.setSinr(sinr);
+                                        apDto.setCellType("nr");
                                     }
                                     apDto.setSource(SingleSourceTypeEnum.CELL.getValue());
                                 }
@@ -1068,7 +971,6 @@ public class MapActivity extends AppCompatActivity {
                 }
             }
         }
-        appendLog("无cell权限!");
         return Collections.emptyList();
     }
 
@@ -1105,7 +1007,7 @@ public class MapActivity extends AppCompatActivity {
                 if (!isPositioning) return;
 
                 requestLocation();
-                handler.postDelayed(this, 1000); // 每秒请求一次
+                handler.postDelayed(this, 3000); // 每n秒请求一次
             }
         };
         handler.post(positioningRunnable);

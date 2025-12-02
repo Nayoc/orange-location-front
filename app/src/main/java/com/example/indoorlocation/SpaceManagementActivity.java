@@ -15,6 +15,7 @@ import android.view.View;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.ImageView;
+import android.widget.LinearLayout;
 import android.widget.Toast;
 import android.Manifest;
 
@@ -60,6 +61,7 @@ public class SpaceManagementActivity extends Activity {
     private File imageFile;
     private AlertDialog currentDialog;
     private LocationHelper locationHelper;
+    private LinearLayout signalTab;
     private static final int STORAGE_PERMISSION_REQUEST_CODE = 103;
     private static final int PICK_IMAGE_FROM_GALLERY = 101; // 图库选择请求码
     private static final int REQUEST_STORAGE_PERMISSION = 102; // 存储权限请求码
@@ -128,6 +130,15 @@ public class SpaceManagementActivity extends Activity {
 
         // 加载空间列表
         fetchSpaces();
+
+        // 信号页
+        // 绑定信号标签
+        signalTab = findViewById(R.id.signal_tab);
+        // 点击信号标签跳转至信号列表页面
+        signalTab.setOnClickListener(v -> {
+            Intent intent = new Intent(SpaceManagementActivity.this, SignalListActivity.class);
+            startActivity(intent);
+        });
     }
 
     private void checkAndRequestPermissions() {
