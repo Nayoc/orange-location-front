@@ -2,7 +2,6 @@ package com.example.indoorlocation;
 
 import static com.example.indoorlocation.SpaceManagementActivity.JSON;
 
-import android.Manifest;
 import android.app.Activity;
 import android.app.AlertDialog;
 import android.content.Context;
@@ -20,7 +19,6 @@ import android.telephony.CellInfoLte;
 import android.telephony.CellInfoNr;
 import android.telephony.CellSignalStrengthLte;
 import android.telephony.CellSignalStrengthNr;
-import android.telephony.TelephonyManager;
 import android.text.Editable;
 import android.text.TextUtils;
 import android.text.TextWatcher;
@@ -48,10 +46,12 @@ import com.example.indoorlocation.api.req.CollectionReq;
 import com.example.indoorlocation.api.req.LocationReq;
 import com.example.indoorlocation.api.req.NavigationReq;
 import com.example.indoorlocation.api.vo.Point;
+import com.example.indoorlocation.cache.CellInfoCache;
 import com.example.indoorlocation.constant.HttpConstant;
 import com.example.indoorlocation.constant.SingleSourceTypeEnum;
 import com.example.indoorlocation.model.ApDto;
 import com.example.indoorlocation.model.Space;
+import com.example.indoorlocation.service.CellMonitorService;
 import com.example.indoorlocation.util.FileUtil;
 import com.example.indoorlocation.view.ZoomableImageView;
 import com.google.gson.Gson;
@@ -96,10 +96,13 @@ public class MapActivity extends AppCompatActivity {
     private TextView tvLog;
     private ScrollView scrollViewLog;
     private EditText etX, etY;
+
+    private LinearLayout singleLocation;
     private LinearLayout layoutSampleCount;
     private Spinner spinnerSampleCount, spinnerMode;
     private List<PointF> rpTracePoints;
     private Button btnBuildFingerprint;
+    private Button btnSingleLocation;
     private Button btnStart;
     private Button btnRpTraceSwitch;
     private Button btnResetData;
@@ -174,6 +177,7 @@ public class MapActivity extends AppCompatActivity {
 
         initViews();
         setupListeners();
+        startService(new Intent(this, CellMonitorService.class));
         loadSpaceData(spaceId);
         loadRpTrace();
     }
@@ -192,6 +196,8 @@ public class MapActivity extends AppCompatActivity {
         etY = findViewById(R.id.et_y);
         layoutSampleCount = findViewById(R.id.layout_sample_count);
         spinnerSampleCount = findViewById(R.id.spinner_sample_count);
+        singleLocation = findViewById(R.id.single_location);
+        btnSingleLocation = findViewById(R.id.btn_single_location);
         spinnerMode = findViewById(R.id.spinner_mode);
         btnBuildFingerprint = findViewById(R.id.btn_build_fingerprint);
         btnStart = findViewById(R.id.btn_start);
@@ -227,7 +233,7 @@ public class MapActivity extends AppCompatActivity {
 
         // 地图点击事件
         ivMap.setOnMapClickListener((x, y) -> {
-            if(!currentMode.equals("采集")){
+            if (!currentMode.equals("采集")) {
                 return;
             }
 
@@ -313,6 +319,8 @@ public class MapActivity extends AppCompatActivity {
         btnRpTraceSwitch.setOnClickListener(v -> switchRpTrace());
 
         btnResetData.setOnClickListener(v -> showResetDataDialog());
+
+        btnSingleLocation.setOnClickListener(v-> runSingleLocation());
     }
 
     private void showResetDataDialog() {
@@ -390,6 +398,7 @@ public class MapActivity extends AppCompatActivity {
 
             layoutSampleCount.setVisibility(View.VISIBLE);
             btnBuildFingerprint.setVisibility(View.VISIBLE);
+            singleLocation.setVisibility(View.GONE);
             btnStart.setText(isCollecting ? "停止采集" : "开始采集");
             ivMap.clearMarker();
             // 设置按钮颜色
@@ -400,6 +409,7 @@ public class MapActivity extends AppCompatActivity {
             }
         } else {
 
+            singleLocation.setVisibility(View.VISIBLE);
             layoutSampleCount.setVisibility(View.GONE);
             btnBuildFingerprint.setVisibility(View.GONE);
             btnStart.setText(isPositioning ? "停止定位" : "开始定位");
@@ -629,6 +639,14 @@ public class MapActivity extends AppCompatActivity {
 
                     Response response = client.newCall(request).execute();
 
+                    String responseBodyStr;
+                    if (response.body() != null) {
+                        responseBodyStr = response.body().string();
+                        response.body().close();
+                    } else {
+                        responseBodyStr = "";
+                    }
+
                     if (response.isSuccessful()) {
                         runOnUiThread(() -> {
                             buildCoordDialog.dismiss();
@@ -638,14 +656,14 @@ public class MapActivity extends AppCompatActivity {
                     } else {
                         runOnUiThread(() -> {
                             buildCoordDialog.dismiss();
-                            appendLog("指纹库构建开启失败");
+                            appendLog("指纹库构建开启失败:" + responseBodyStr);
                         });
                     }
 
                 } catch (Exception e) {
                     runOnUiThread(() -> {
                         buildCoordDialog.dismiss();
-                        appendLog("指纹库构建开启异常: " + e.getMessage());
+                        appendLog("指纹库构建开启异常:" + e.getMessage());
                     });
                 }
             }).start();
@@ -923,55 +941,57 @@ public class MapActivity extends AppCompatActivity {
 
     // 获取5G RSRP值（需要实现实际逻辑）
     private List<ApDto> getCellList() {
-        TelephonyManager telephonyManager = (TelephonyManager) getSystemService(Context.TELEPHONY_SERVICE);
-        if (telephonyManager != null) {
-            if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
-                List<CellInfo> cellInfos = telephonyManager.getAllCellInfo();
-                if (cellInfos != null && !cellInfos.isEmpty()) {
-                    List<ApDto> results = cellInfos.stream()
-                            .map(cellInfo -> {
-                                ApDto apDto = new ApDto();
-                                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                                    if (cellInfo instanceof CellInfoLte) {
-                                        CellInfoLte lte = (CellInfoLte) cellInfo;
-                                        CellSignalStrengthLte signal = (CellSignalStrengthLte) lte.getCellSignalStrength();
-                                        int rsrp = signal.getRsrp();
-                                        int rsrq = lte.getCellSignalStrength().getRsrq();
-                                        int sinr = signal.getRssnr();
 
-                                        // 使用物理小区id，也可以用全局id
-                                        apDto.setApId(String.valueOf(lte.getCellIdentity().getCi()));
-                                        apDto.setRsrp(rsrp);
-                                        apDto.setRsrq(rsrq);
-                                        apDto.setSinr(sinr > -20 && sinr < 30 ? sinr : -20);
-                                        apDto.setCellType("lte");
-                                    } else if (cellInfo instanceof CellInfoNr) {
-                                        CellInfoNr nr = (CellInfoNr) cellInfo;
-                                        CellSignalStrengthNr signal = (CellSignalStrengthNr) nr.getCellSignalStrength();
-                                        int rsrp = signal.getSsRsrp();
-                                        int rsrq = signal.getSsRsrq();
-                                        int sinr = signal.getSsSinr();
-                                        apDto.setApId(String.valueOf(((CellIdentityNr) nr.getCellIdentity()).getNci()));
-                                        apDto.setRsrp(rsrp);
-                                        apDto.setRsrq(rsrq);
-                                        apDto.setSinr(sinr);
-                                        apDto.setCellType("nr");
-                                    }
-                                    apDto.setSource(SingleSourceTypeEnum.CELL.getValue());
-                                }
-                                return apDto;
-                            })
-                            .filter(apDto -> apDto.getRsrp() != null)
-                            .collect(Collectors.toList());
+        List<CellInfo> cellInfos = CellInfoCache.getLatest();
 
-                    Set<String> seenFields = new LinkedHashSet<>();
-                    return results.stream()
-                            .filter(item -> seenFields.add(item.getApId()))
-                            .collect(Collectors.toList());
-                }
-            }
+        if (cellInfos == null || cellInfos.isEmpty()) {
+            return Collections.emptyList();
         }
-        return Collections.emptyList();
+
+        List<ApDto> results = cellInfos.stream()
+                .map(cellInfo -> {
+
+                    ApDto apDto = new ApDto();
+
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+
+                        if (cellInfo instanceof CellInfoLte && cellInfo.isRegistered()) {
+
+                            CellInfoLte lte = (CellInfoLte) cellInfo;
+                            CellSignalStrengthLte signal = lte.getCellSignalStrength();
+
+                            apDto.setApId(String.valueOf(lte.getCellIdentity().getCi()));
+                            apDto.setRsrp(signal.getRsrp());
+                            apDto.setRsrq(signal.getRsrq());
+                            apDto.setSinr(signal.getRssnr());
+                            apDto.setCellType("lte");
+                        } else if (cellInfo instanceof CellInfoNr && cellInfo.isRegistered()) {
+
+                            CellInfoNr nr = (CellInfoNr) cellInfo;
+                            CellSignalStrengthNr signal =
+                                    (CellSignalStrengthNr) nr.getCellSignalStrength();
+
+                            apDto.setApId(String.valueOf(
+                                    ((CellIdentityNr) nr.getCellIdentity()).getNci()));
+
+                            apDto.setRsrp(signal.getSsRsrp());
+                            apDto.setRsrq(signal.getSsRsrq());
+                            apDto.setSinr(signal.getSsSinr());
+                            apDto.setCellType("nr");
+                        }
+
+                        apDto.setSource(SingleSourceTypeEnum.CELL.getValue());
+                    }
+
+                    return apDto;
+                })
+                .filter(ap -> ap.getRsrp() != null)
+                .collect(Collectors.toList());
+
+        Set<String> seenFields = new LinkedHashSet<>();
+        return results.stream()
+                .filter(item -> seenFields.add(item.getApId()))
+                .collect(Collectors.toList());
     }
 
     private void togglePosition() {
@@ -1067,6 +1087,10 @@ public class MapActivity extends AppCompatActivity {
         }).start();
     }
 
+    private void runSingleLocation(){
+        requestLocation();
+    }
+
     private void requestLocation() {
         new Thread(() -> {
             try {
@@ -1086,6 +1110,7 @@ public class MapActivity extends AppCompatActivity {
                 req.setCreateTime(time);
                 req.setNavigationBatchId(navigationBatchId);
                 req.setApList(apList);
+                req.setIsSingle(Boolean.TRUE);
 
                 String json = gson.toJson(req);
                 RequestBody body = RequestBody.create(json, JSON);
@@ -1106,7 +1131,7 @@ public class MapActivity extends AppCompatActivity {
                     float x = point.getX();
                     float y = point.getY();
 
-                    ivMap.setMarkerPoint(x,y);
+                    ivMap.setMarkerPoint(x, y);
 
                     runOnUiThread(() -> {
                         etX.setText(String.valueOf(x));

@@ -6,6 +6,7 @@
     <string name="coordinate_default">0</string>
     <string name="collect_count">采集:</string>
     <string name="start_collect">开始采集</string>
+    <string name="single_location">单次定位</string>
     <string name="build_fingerprint">构建数据集</string>
     <string name="reset_data">重置数据</string>
     <string name="rp_trace_switch">开启/关闭rp痕迹</string>

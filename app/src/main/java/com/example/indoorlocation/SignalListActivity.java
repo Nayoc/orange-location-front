@@ -2,6 +2,7 @@ package com.example.indoorlocation;
 
 import android.Manifest;
 import android.content.Context;
+import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.net.wifi.ScanResult;
 import android.net.wifi.WifiManager;
@@ -24,8 +25,10 @@ import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 
+import com.example.indoorlocation.cache.CellInfoCache;
 import com.example.indoorlocation.constant.SingleSourceTypeEnum;
 import com.example.indoorlocation.model.ApDto;
+import com.example.indoorlocation.service.CellMonitorService;
 
 import java.util.Collections;
 import java.util.Comparator;
@@ -62,6 +65,9 @@ public class SignalListActivity extends AppCompatActivity {
         } else {
             ActivityCompat.requestPermissions(this, requiredPermissions, REQUEST_PERMISSION_CODE);
         }
+
+        startService(new Intent(this, CellMonitorService.class));
+
 
         // 刷新按钮点击事件
         refreshBtn.setOnClickListener(v -> loadAndShowSignals());
@@ -196,55 +202,112 @@ public class SignalListActivity extends AppCompatActivity {
     }
 
     // 获取5G RSRP值（需要实现实际逻辑）
+//    private List<ApDto> getCellList() {
+//        TelephonyManager telephonyManager = (TelephonyManager) getSystemService(Context.TELEPHONY_SERVICE);
+//        if (telephonyManager != null) {
+//            if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
+//                List<CellInfo> cellInfos = telephonyManager.getAllCellInfo();
+//                if (cellInfos != null && !cellInfos.isEmpty()) {
+//                    List<ApDto> results = cellInfos.stream()
+//                            .map(cellInfo -> {
+//                                ApDto apDto = new ApDto();
+//                                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+//                                    if (cellInfo instanceof CellInfoLte) {
+//                                        CellInfoLte lte = (CellInfoLte) cellInfo;
+//                                        CellSignalStrengthLte signal = (CellSignalStrengthLte) lte.getCellSignalStrength();
+//                                        int rsrp = signal.getRsrp();
+//                                        int rsrq = lte.getCellSignalStrength().getRsrq();
+//                                        int sinr = signal.getRssnr();
+//
+//                                        // 使用物理小区id，也可以用全局id
+//                                        apDto.setApId(String.valueOf(lte.getCellIdentity().getCi()));
+//                                        apDto.setRsrp(rsrp);
+//                                        apDto.setRsrq(rsrq);
+//                                        apDto.setSinr(sinr > -20 && sinr < 30 ? sinr : -20);
+//                                        apDto.setCellType("lte");
+//                                    } else if (cellInfo instanceof CellInfoNr) {
+//                                        CellInfoNr nr = (CellInfoNr) cellInfo;
+//                                        CellSignalStrengthNr signal = (CellSignalStrengthNr) nr.getCellSignalStrength();
+//                                        int rsrp = signal.getSsRsrp();
+//                                        int rsrq = signal.getSsRsrq();
+//                                        int sinr = signal.getSsSinr();
+//                                        apDto.setApId(String.valueOf(((CellIdentityNr) nr.getCellIdentity()).getNci()));
+//                                        apDto.setRsrp(rsrp);
+//                                        apDto.setRsrq(rsrq);
+//                                        apDto.setSinr(sinr);
+//                                        apDto.setCellType("nr");
+//                                    }
+//                                    apDto.setSource(SingleSourceTypeEnum.CELL.getValue());
+//                                }
+//                                return apDto;
+//                            })
+//                            .filter(apDto -> apDto.getRsrp() != null)
+//                            .collect(Collectors.toList());
+//
+//                    Set<String> seenFields = new LinkedHashSet<>();
+//                    return results.stream()
+//                            .filter(item -> seenFields.add(item.getApId()))
+//                            .collect(Collectors.toList());
+//                }
+//            }
+//        }
+//        return Collections.emptyList();
+//    }
+
     private List<ApDto> getCellList() {
-        TelephonyManager telephonyManager = (TelephonyManager) getSystemService(Context.TELEPHONY_SERVICE);
-        if (telephonyManager != null) {
-            if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
-                List<CellInfo> cellInfos = telephonyManager.getAllCellInfo();
-                if (cellInfos != null && !cellInfos.isEmpty()) {
-                    List<ApDto> results = cellInfos.stream()
-                            .map(cellInfo -> {
-                                ApDto apDto = new ApDto();
-                                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                                    if (cellInfo instanceof CellInfoLte) {
-                                        CellInfoLte lte = (CellInfoLte) cellInfo;
-                                        CellSignalStrengthLte signal = (CellSignalStrengthLte) lte.getCellSignalStrength();
-                                        int rsrp = signal.getRsrp();
-                                        int rsrq = lte.getCellSignalStrength().getRsrq();
-                                        int sinr = signal.getRssnr();
 
-                                        // 使用物理小区id，也可以用全局id
-                                        apDto.setApId(String.valueOf(lte.getCellIdentity().getCi()));
-                                        apDto.setRsrp(rsrp);
-                                        apDto.setRsrq(rsrq);
-                                        apDto.setSinr(sinr > -20 && sinr < 30 ? sinr : -20);
-                                        apDto.setCellType("lte");
-                                    } else if (cellInfo instanceof CellInfoNr) {
-                                        CellInfoNr nr = (CellInfoNr) cellInfo;
-                                        CellSignalStrengthNr signal = (CellSignalStrengthNr) nr.getCellSignalStrength();
-                                        int rsrp = signal.getSsRsrp();
-                                        int rsrq = signal.getSsRsrq();
-                                        int sinr = signal.getSsSinr();
-                                        apDto.setApId(String.valueOf(((CellIdentityNr) nr.getCellIdentity()).getNci()));
-                                        apDto.setRsrp(rsrp);
-                                        apDto.setRsrq(rsrq);
-                                        apDto.setSinr(sinr);
-                                        apDto.setCellType("nr");
-                                    }
-                                    apDto.setSource(SingleSourceTypeEnum.CELL.getValue());
-                                }
-                                return apDto;
-                            })
-                            .filter(apDto -> apDto.getRsrp() != null)
-                            .collect(Collectors.toList());
+        List<CellInfo> cellInfos = CellInfoCache.getLatest();
 
-                    Set<String> seenFields = new LinkedHashSet<>();
-                    return results.stream()
-                            .filter(item -> seenFields.add(item.getApId()))
-                            .collect(Collectors.toList());
-                }
-            }
+        if (cellInfos == null || cellInfos.isEmpty()) {
+            return Collections.emptyList();
         }
-        return Collections.emptyList();
+
+        List<ApDto> results = cellInfos.stream()
+                .map(cellInfo -> {
+
+                    ApDto apDto = new ApDto();
+
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+
+                        if (cellInfo instanceof CellInfoLte && cellInfo.isRegistered()) {
+
+                            CellInfoLte lte = (CellInfoLte) cellInfo;
+                            CellSignalStrengthLte signal = lte.getCellSignalStrength();
+
+                            apDto.setApId(String.valueOf(lte.getCellIdentity().getCi()));
+                            apDto.setRsrp(signal.getRsrp());
+                            apDto.setRsrq(signal.getRsrq());
+                            apDto.setSinr(signal.getRssnr());
+                            apDto.setCellType("lte");
+                        }
+
+                        else if (cellInfo instanceof CellInfoNr && cellInfo.isRegistered()) {
+
+                            CellInfoNr nr = (CellInfoNr) cellInfo;
+                            CellSignalStrengthNr signal =
+                                    (CellSignalStrengthNr) nr.getCellSignalStrength();
+
+                            apDto.setApId(String.valueOf(
+                                    ((CellIdentityNr) nr.getCellIdentity()).getNci()));
+
+                            apDto.setRsrp(signal.getSsRsrp());
+                            apDto.setRsrq(signal.getSsRsrq());
+                            apDto.setSinr(signal.getSsSinr());
+                            apDto.setCellType("nr");
+                        }
+
+                        apDto.setSource(SingleSourceTypeEnum.CELL.getValue());
+                    }
+
+                    return apDto;
+                })
+                .filter(ap -> ap.getRsrp() != null)
+                .collect(Collectors.toList());
+
+        Set<String> seenFields = new LinkedHashSet<>();
+        return results.stream()
+                .filter(item -> seenFields.add(item.getApId()))
+                .collect(Collectors.toList());
     }
+
 }

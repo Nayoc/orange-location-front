@@ -16,6 +16,7 @@ public class LocationReq {
     private String navigationBatchId;
 
     private List<ApDto> apList;
+    private Boolean isSingle = Boolean.FALSE;
 
     private String createTime;
 }

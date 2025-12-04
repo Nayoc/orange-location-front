@@ -33,6 +33,11 @@
         <activity android:name=".SignalListActivity"
             android:exported="false"
             android:theme="@style/Theme.AppCompat.Light.NoActionBar" />
+
+        <service
+            android:name=".service.CellMonitorService"
+            android:foregroundServiceType="location"
+            android:exported="false"/>
     </application>
 
     <uses-permission android:name="android.permission.READ_PHONE_STATE" />
@@ -47,8 +52,12 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
+
         <!-- Android 13+ 图片权限 -->
     <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION"/>
+
 
     <uses-permission android:name="android.permission.NEARBY_WIFI_DEVICES"
         android:usesPermissionFlags="neverForLocation" /> <!-- 声明仅用于扫描，不用于定位 -->
@@ -56,4 +65,5 @@
     <!-- 可选：声明应用使用 WiFi 扫描功能（部分机型需要） -->
     <uses-feature android:name="android.hardware.wifi" android:required="true" />
     <uses-permission android:name="android.permission.CHANGE_WIFI_STATE"/>
+
 </manifest>
